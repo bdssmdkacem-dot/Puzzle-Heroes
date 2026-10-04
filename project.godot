@@ -9,6 +9,11 @@ window/size/viewport_height=1280
 window/size/window_width_override=432
 window/size/window_height_override=768
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+window/size/resizable=true
+window/size/fullscreen=true
+window/handheld/immersive_mode=true
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
