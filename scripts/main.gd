@@ -157,6 +157,14 @@ var art_attack_phase := 0.0
 var art_hit_flash := 0.0
 var art_defeat_phase := 0.0
 
+# Premium Content 8: layered VFX / cinematic attack state.
+var impact_bursts: Array = []
+var slash_effects: Array = []
+var boss_projectiles: Array = []
+var defeat_burst := 0.0
+var transition_phase := 0.0
+var juice_pulse := 0.0
+
 func _ready() -> void:
     randomize()
     _load_progress()
@@ -170,6 +178,12 @@ func _process(delta: float) -> void:
     art_attack_phase = maxf(0.0, art_attack_phase - delta * 3.8)
     art_hit_flash = maxf(0.0, art_hit_flash - delta * 5.5)
     art_defeat_phase = maxf(0.0, art_defeat_phase - delta * 1.8)
+    defeat_burst = maxf(0.0, defeat_burst - delta * 1.4)
+    transition_phase += delta * 6.0
+    juice_pulse = maxf(0.0, juice_pulse - delta * 4.0)
+    _update_impact_bursts(delta)
+    _update_slash_effects(delta)
+    _update_boss_projectiles(delta)
     hero_anim_phase += delta * 7.0
     snake_boss_phase += delta * (2.2 if combat_active else 1.1)
     boss_pulse = maxf(0.0, boss_pulse - delta * 2.2)
@@ -323,6 +337,11 @@ func _new_level() -> void:
     booster_paths.clear()
     vfx_rings.clear()
     tile_trails.clear()
+    impact_bursts.clear()
+    slash_effects.clear()
+    boss_projectiles.clear()
+    defeat_burst = 0.0
+    juice_pulse = 0.0
     hazards.clear()
     for y in ROWS:
         hazards.append([])
@@ -357,6 +376,9 @@ func _draw() -> void:
     _draw_tile_trails()
     _draw_vfx_rings()
     _draw_effects()
+    _draw_impact_bursts()
+    _draw_slash_effects()
+    _draw_boss_projectiles()
     _draw_rescue_confetti()
     _draw_rescue_badge()
     if level_won or level_lost:
@@ -1505,6 +1527,8 @@ func _apply_snake_damage(match_count: int) -> void:
     hero_strike = 1.0
     art_attack_phase = 1.0
     art_hit_flash = 1.0
+    juice_pulse = 1.0
+    _spawn_boss_attack_sequence(damage)
     screen_shake = maxf(screen_shake, 0.62)
     camera_zoom = 1.045
     boss_pulse = 1.0
@@ -1557,6 +1581,84 @@ func _spawn_snake_hit_vfx(damage: int) -> void:
             "target": p,
             "kind": 3
         })
+
+func _spawn_impact_burst(p: Vector2, radius: float, color: Color, life: float = 0.34) -> void:
+    impact_bursts.append({"p": p, "r": radius, "t": 0.0, "life": life, "color": color})
+
+func _spawn_boss_attack_sequence(damage: int) -> void:
+    var origin := Vector2(hero_x + 30.0, hero_y - 8.0)
+    var target := Vector2(575, 330)
+    var color := Color("ffcf5a")
+    match boss_kind:
+        "guardian": color = Color("8fe8ff")
+        "beast": color = Color("ff694f")
+        "dragon": color = Color("c97aff")
+        "snake": color = Color("ffb34d")
+    _spawn_impact_burst(origin, 55.0 + damage * 8.0, color, 0.24)
+    slash_effects.append({"a": origin, "b": target, "t": 0.0, "life": 0.28, "color": color})
+    boss_projectiles.append({"p": origin, "target": target, "t": 0.0, "life": 0.34, "color": color})
+    if damage >= 2:
+        boss_projectiles.append({"p": origin + Vector2(0, 18), "target": target + Vector2(0, -18), "t": 0.04, "life": 0.30, "color": Color("fff1a8")})
+
+func _spawn_boss_defeat_vfx() -> void:
+    var p := Vector2(575, 330)
+    _spawn_impact_burst(p, 190.0, Color("ffe17a"), 0.72)
+    _spawn_impact_burst(p, 105.0, Color("ff704f"), 0.46)
+    for i in range(22):
+        var a := TAU * float(i) / 22.0
+        boss_projectiles.append({"p": p, "target": p + Vector2(cos(a), sin(a)) * (90.0 + randi() % 120), "t": 0.0, "life": 0.65, "color": Color("ffe38a")})
+
+func _update_impact_bursts(delta: float) -> void:
+    for i in range(impact_bursts.size() - 1, -1, -1):
+        var e: Dictionary = impact_bursts[i]
+        e["t"] = float(e["t"]) + delta
+        impact_bursts[i] = e
+        if float(e["t"]) >= float(e["life"]): impact_bursts.remove_at(i)
+
+func _update_slash_effects(delta: float) -> void:
+    for i in range(slash_effects.size() - 1, -1, -1):
+        var e: Dictionary = slash_effects[i]
+        e["t"] = float(e["t"]) + delta
+        slash_effects[i] = e
+        if float(e["t"]) >= float(e["life"]): slash_effects.remove_at(i)
+
+func _update_boss_projectiles(delta: float) -> void:
+    for i in range(boss_projectiles.size() - 1, -1, -1):
+        var e: Dictionary = boss_projectiles[i]
+        e["t"] = float(e["t"]) + delta
+        boss_projectiles[i] = e
+        if float(e["t"]) >= float(e["life"]): boss_projectiles.remove_at(i)
+
+func _draw_impact_bursts() -> void:
+    for e in impact_bursts:
+        var life := clampf(1.0 - float(e["t"]) / float(e["life"]), 0.0, 1.0)
+        var t := 1.0 - life
+        var p: Vector2 = e["p"]
+        var r := float(e["r"]) * (0.25 + t * 0.75)
+        var c: Color = e["color"]
+        c.a = life * 0.55
+        draw_circle(p, r, Color(c.r,c.g,c.b,c.a * 0.10))
+        draw_arc(p, r, 0, TAU, 36, c, 7.0)
+        draw_arc(p, r * 0.62, 0, TAU, 28, Color(1,0.94,0.7,life*0.7), 4.0)
+
+func _draw_slash_effects() -> void:
+    for e in slash_effects:
+        var life := clampf(1.0 - float(e["t"]) / float(e["life"]), 0.0, 1.0)
+        var p: Vector2 = e["a"].lerp(e["b"], 1.0 - life)
+        var d: Vector2 = (e["b"] - e["a"]).normalized()
+        var side := Vector2(-d.y, d.x) * 22.0 * life
+        var c: Color = e["color"]
+        draw_line(p - side - d * 28.0, p + side + d * 28.0, Color(c.r,c.g,c.b,life*0.28), 18.0)
+        draw_line(p - side, p + side, Color(1,1,0.88,life*0.95), 6.0)
+
+func _draw_boss_projectiles() -> void:
+    for e in boss_projectiles:
+        var t := clampf(float(e["t"]) / float(e["life"]), 0.0, 1.0)
+        var p: Vector2 = e["p"].lerp(e["target"], t)
+        var life := 1.0 - t
+        var c: Color = e["color"]
+        draw_texture_rect(PARTICLE_TEX, Rect2(p - Vector2.ONE * (18.0 + 14.0 * life), Vector2.ONE * (36.0 + 28.0 * life)), false, Color(c.r,c.g,c.b,life*0.9))
+        draw_circle(p, 5.0 + 5.0 * life, Color(1,1,1,life))
 
 func _spawn_rescue_celebration() -> void:
     rescue_confetti.clear()
@@ -1847,6 +1949,8 @@ func _complete_level() -> void:
     _save_progress()
     rescue_celebration = 1.0
     art_defeat_phase = 1.0
+    defeat_burst = 1.0
+    _spawn_boss_defeat_vfx()
     screen_shake = 0.25
     camera_zoom = 1.035
     _spawn_rescue_celebration()
