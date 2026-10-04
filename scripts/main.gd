@@ -137,7 +137,7 @@ func _draw_rescue_scene() -> void:
     # Wall bands and floor.
     for y in range(125, 470, 52):
         for x in range(34, 690, 82):
-            var off := 41 if ((y / 52) as int) % 2 == 1 else 0
+            var off := 41 if int(y / 52) % 2 == 1 else 0
             draw_rect(Rect2(x + off, y, 74, 46), Color("4b3b2c"), true)
             draw_rect(Rect2(x + off, y, 74, 46), Color("6d5238"), false, 2)
     draw_rect(Rect2(28, 470, 664, 176), Color("8b6a42"))
