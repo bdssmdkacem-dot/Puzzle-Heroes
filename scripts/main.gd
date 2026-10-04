@@ -792,7 +792,25 @@ func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
                 cells[Vector2i(x, first.y)] = true
             for y in ROWS:
                 cells[Vector2i(first.x, y)] = true
-    return Array(cells.keys())
+    var result: Array[Vector2i] = Array(cells.keys())
+    _spawn_booster_paths(result)
+    return result
+
+func _spawn_booster_paths(cells: Array[Vector2i]) -> void:
+    var seen := {}
+    for cell in cells:
+        if not _inside(cell) or seen.has(cell):
+            continue
+        seen[cell] = true
+        var center := Vector2(BOARD_X + cell.x * CELL + (CELL - 5) * 0.5, BOARD_Y + cell.y * CELL + (CELL - 5) * 0.5)
+        var value: int = board[cell.y][cell.x]
+        if value == SPECIAL_H:
+            booster_paths.append({"from": center - Vector2(CELL * 2.8, 0), "to": center + Vector2(CELL * 2.8, 0), "t": 0.0, "life": 0.30})
+        elif value == SPECIAL_V:
+            booster_paths.append({"from": center - Vector2(0, CELL * 2.3), "to": center + Vector2(0, CELL * 2.3), "t": 0.0, "life": 0.30})
+        elif value == SPECIAL_BOMB:
+            for dir in [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP]:
+                booster_paths.append({"from": center, "to": center + dir * CELL * 1.9, "t": 0.0, "life": 0.24})
 
 func _check_goal() -> void:
     if goal_kind == "collect" and goal_progress >= goal_target:
