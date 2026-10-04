@@ -1,10 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="636" height="272" viewBox="0 0 636 272">
-<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#7ec8eb"/><stop offset="1" stop-color="#d9f0d2"/></linearGradient><linearGradient id="ground" x2="0" y2="1"><stop stop-color="#82ad59"/><stop offset="1" stop-color="#557c43"/></linearGradient></defs>
-<rect width="636" height="272" fill="url(#sky)"/><circle cx="540" cy="45" r="28" fill="#ffe59a"/>
-<path d="M0 135 110 75l90 60 120-72 95 70 121-52 90 54v45H0z" fill="#557f57"/>
-<path d="M0 150h636v122H0z" fill="url(#ground)"/>
-<path d="M70 272Q170 210 285 238T500 210L636 230v42z" fill="#d7b978"/>
-<path d="M72 272Q176 218 285 246T500 218" fill="none" stroke="#efd79b" stroke-width="18" stroke-linecap="round"/>
-<g fill="#3e7142"><circle cx="42" cy="155" r="17"/><circle cx="70" cy="147" r="25"/><circle cx="102" cy="158" r="18"/><circle cx="570" cy="150" r="20"/><circle cx="603" cy="140" r="29"/><circle cx="628" cy="157" r="18"/></g>
-<g fill="#9bc45c"><circle cx="28" cy="169" r="9"/><circle cx="90" cy="172" r="8"/><circle cx="555" cy="172" r="8"/><circle cx="620" cy="178" r="9"/></g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#1b2028"/><stop offset=".58" stop-color="#3b2d25"/><stop offset="1" stop-color="#17120f"/></linearGradient>
+ <linearGradient id="gold" x2="0" y2="1"><stop stop-color="#ffe08a"/><stop offset=".45" stop-color="#c88b22"/><stop offset="1" stop-color="#6b4311"/></linearGradient>
+ <radialGradient id="lamp"><stop stop-color="#fff3b0"/><stop offset=".35" stop-color="#dcae3f" stop-opacity=".7"/><stop offset="1" stop-color="#dcae3f" stop-opacity="0"/></radialGradient>
+ <pattern id="stone" width="150" height="85" patternUnits="userSpaceOnUse"><rect width="150" height="85" fill="#40352d"/><path d="M4 7h68v34H4zM82 7h63v34H82zM28 48h92v31H28z" fill="#514238" stroke="#2b241f" stroke-width="7"/></pattern>
+</defs>
+<rect width="1200" height="700" fill="url(#bg)"/>
+<ellipse cx="600" cy="110" rx="480" ry="210" fill="url(#lamp)"/>
+<rect x="0" y="0" width="1200" height="700" fill="url(#stone)" opacity=".72"/>
+<path d="M85 650V105Q85 55 135 55H1065Q1115 55 1115 105V650" fill="none" stroke="#a66e1c" stroke-width="42"/>
+<path d="M85 650V105Q85 55 135 55H1065Q1115 55 1115 105V650" fill="none" stroke="url(#gold)" stroke-width="28"/>
+<path d="M170 565H1030V700H170z" fill="#5a412c"/>
+<path d="M170 565H1030" stroke="#e5b64b" stroke-width="14"/>
+<g opacity=".65"><path d="M200 600h100v70H200zM330 600h100v70H330zM460 600h100v70H460zM590 600h100v70H590zM720 600h100v70H720zM850 600h100v70H850z" fill="#765636" stroke="#3b291e" stroke-width="6"/></g>
+<g transform="translate(180 105)"><circle r="42" fill="#e7bd50" opacity=".9"/><circle r="31" fill="#fff0a1"/></g>
+<g transform="translate(1010 120)"><circle r="42" fill="#e7bd50" opacity=".9"/><circle r="31" fill="#fff0a1"/></g>
+<path d="M120 550Q250 505 375 545T625 540T875 545T1080 530" fill="none" stroke="#d3aa63" stroke-width="18" opacity=".8"/>
 </svg>
