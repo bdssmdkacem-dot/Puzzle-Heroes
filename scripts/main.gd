@@ -642,6 +642,11 @@ func _draw_end_panel() -> void:
         draw_string(ThemeDB.fallback_font, Vector2(190, 585), "+%d ◆" % (level_coins + earned * 5 + chest_reward), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffe17a"))
         if chest_reward > 0:
             draw_string(ThemeDB.fallback_font, Vector2(190, 615), "صندوق كنز: +%d ◆ +قدرات" % chest_reward, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffd45b"))
+        if level_number in [3, 6, 9, 10]:
+            var epilogue := "العالم مكتمل! الطريق التالي مفتوح."
+            if level_number == 10:
+                epilogue = "النهاية: سقط التنين وعادت المملكة إلى الأبطال."
+            draw_string(ThemeDB.fallback_font, Vector2(95, 635), epilogue, HORIZONTAL_ALIGNMENT_LEFT, 530, 16, Color("bfe7ff"))
         draw_rect(Rect2(165, 650, 390, 70), Color("b98220"))
         draw_string(ThemeDB.fallback_font, Vector2(250, 696), "CONTINUER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
     else:
