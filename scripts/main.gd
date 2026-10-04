@@ -56,6 +56,13 @@ var hazards: Array = []
 var boss_turn := 0
 var boss_enraged := false
 var world_flash := 0.0
+var screen_transition := 0.0
+var map_pulse := 0.0
+var boss_intro := 0.0
+var result_timer := 0.0
+var star_reveal := 0.0
+var reward_pop := 0.0
+var unlock_flash := 0.0
 
 var dragging := false
 var drag_start := Vector2.ZERO
@@ -166,6 +173,14 @@ func _process(delta: float) -> void:
     combo_flash = maxf(0.0, combo_flash - delta * 2.8)
     fever = maxf(0.0, fever - delta)
     world_flash = maxf(0.0, world_flash - delta * 2.5)
+    screen_transition = maxf(0.0, screen_transition - delta * 2.8)
+    map_pulse += delta * 2.0
+    boss_intro = maxf(0.0, boss_intro - delta)
+    result_timer += delta
+    if level_won or level_lost:
+        star_reveal = minf(3.0, star_reveal + delta * 2.7)
+        reward_pop = minf(1.0, reward_pop + delta * 3.5)
+    unlock_flash = maxf(0.0, unlock_flash - delta * 3.0)
     fever_flash = maxf(0.0, fever_flash - delta * 3.0)
     near_miss_flash = maxf(0.0, near_miss_flash - delta * 3.5)
     _update_tile_animations(delta)
@@ -321,6 +336,10 @@ func _draw() -> void:
     _draw_rescue_badge()
     if level_won or level_lost:
         _draw_end_panel()
+    if screen_transition > 0.0:
+        draw_rect(Rect2(0, 0, 720, 1280), Color(0.03, 0.02, 0.02, screen_transition))
+    if boss_intro > 0.0 and combat_active:
+        _draw_boss_cinematic()
 
 func _configure_level_hazards() -> void:
     match world_id(level_number):
@@ -434,6 +453,8 @@ func _start_level(selected_level: int) -> void:
         queue_redraw()
         return
     screen_mode = "level"
+    screen_transition = 1.0
+    result_timer = 0.0
     _new_level()
 
 func _start_story_level() -> void:
@@ -604,7 +625,8 @@ func _draw_campaign_map() -> void:
         var p: Vector2 = nodes[i]
         var unlocked := _is_level_unlocked(i + 1)
         var completed: int = level_stars[i + 1]
-        draw_circle(p,44,Color("30271f"))
+        var node_scale := 1.0 + (0.06 * sin(map_pulse * 2.0 + float(i)) if unlocked and i + 1 == unlocked_level else 0.0)
+        draw_circle(p,44 * node_scale,Color("30271f"))
         draw_circle(p,39,Color("d1a04a") if unlocked else Color("4b443d"))
         draw_circle(p,31,Color("4d3925") if unlocked else Color("272421"))
         draw_string(ThemeDB.fallback_font,p+Vector2(-10,9),str(i+1),HORIZONTAL_ALIGNMENT_LEFT,-1,24,Color.WHITE if unlocked else Color("8c857b"))
@@ -631,38 +653,75 @@ func _handle_map_tap(pos: Vector2) -> void:
             _start_level(i + 1)
             return
 
+func _draw_boss_cinematic() -> void:
+    var t := clampf(boss_intro / 2.2, 0.0, 1.0)
+    var pulse := sin((1.0 - t) * PI)
+    draw_rect(Rect2(0, 0, 720, 660), Color(0.04, 0.015, 0.02, 0.76))
+    draw_rect(Rect2(30, 170, 660, 300), Color(0.10, 0.035, 0.03, 0.96))
+    draw_rect(Rect2(38, 178, 644, 284), Color("8b2d22"), false, 5)
+    draw_string(ThemeDB.fallback_font, Vector2(210, 235), "⚠  BOSS  ⚠", HORIZONTAL_ALIGNMENT_LEFT, -1, 34 + pulse * 7.0, Color("ffcf5a"))
+    draw_string(ThemeDB.fallback_font, Vector2(170, 285), _boss_name(), HORIZONTAL_ALIGNMENT_LEFT, 380, 48, Color("fff1d0"))
+    draw_string(ThemeDB.fallback_font, Vector2(145, 335), "استعد للمواجهة الأخيرة لهذا المستوى", HORIZONTAL_ALIGNMENT_LEFT, 430, 19, Color("e8cbb0"))
+    draw_string(ThemeDB.fallback_font, Vector2(170, 385), "PV  %d / %d" % [snake_hp, boss_max_hp], HORIZONTAL_ALIGNMENT_LEFT, 380, 22, Color("ff927b"))
+    draw_rect(Rect2(155, 410, 410, 18), Color("301b19"))
+    draw_rect(Rect2(155, 410, 410.0 * float(snake_hp) / maxf(1.0, float(boss_max_hp)), 18), Color("e34a3f"))
+    if boss_intro < 0.65:
+        draw_string(ThemeDB.fallback_font, Vector2(245, 515), "ابدأ الهجوم!", HORIZONTAL_ALIGNMENT_LEFT, -1, 27, Color("ffe17a"))
+
 func _draw_end_panel() -> void:
-    draw_rect(Rect2(55, 350, 610, 430), Color(0.06, 0.04, 0.03, 0.96))
-    draw_rect(Rect2(62, 357, 596, 416), Color("6d4a24"), false, 5)
+    draw_rect(Rect2(35, 285, 650, 520), Color(0.025, 0.018, 0.015, 0.92))
+    draw_rect(Rect2(45, 295, 630, 500), Color("8f682b"), false, 6)
     if level_won:
-        draw_string(ThemeDB.fallback_font, Vector2(175, 430), "NIVEAU RÉUSSI !", HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color("ffe17a"))
         var earned := 3 if moves >= 12 else (2 if moves >= 6 else 1)
-        draw_string(ThemeDB.fallback_font, Vector2(220, 490), "★".repeat(earned), HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("ffd34d"))
-        draw_string(ThemeDB.fallback_font, Vector2(190, 545), "%d points" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
-        draw_string(ThemeDB.fallback_font, Vector2(190, 585), "+%d ◆" % (level_coins + earned * 5 + chest_reward), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffe17a"))
+        var pop := 1.0 + sin(reward_pop * PI) * 0.04
+        draw_string(ThemeDB.fallback_font, Vector2(190, 365), "LEVEL COMPLETE!", HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color("ffe17a"))
+        draw_string(ThemeDB.fallback_font, Vector2(180, 408), "أحسنت! الطريق التالي أصبح مفتوحاً", HORIZONTAL_ALIGNMENT_LEFT, 380, 18, Color("e8dcc8"))
+        for i in range(3):
+            var shown := star_reveal >= float(i + 1)
+            var p := Vector2(260 + i * 100, 495)
+            var s := 38.0 * (pop if shown and i == earned - 1 else 1.0)
+            draw_circle(p, s + 5, Color(0.18,0.12,0.04,0.9))
+            draw_string(ThemeDB.fallback_font, p + Vector2(-20, 14), "★" if shown and i < earned else "☆", HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("ffd34d") if shown and i < earned else Color("766d61"))
+        draw_string(ThemeDB.fallback_font, Vector2(205, 555), "%d points" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 23, Color.WHITE)
+        draw_string(ThemeDB.fallback_font, Vector2(205, 592), "+%d ◆" % (level_coins + earned * 5 + chest_reward), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffe17a"))
         if chest_reward > 0:
-            draw_string(ThemeDB.fallback_font, Vector2(190, 615), "صندوق كنز: +%d ◆ +قدرات" % chest_reward, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffd45b"))
+            draw_string(ThemeDB.fallback_font, Vector2(145, 630), "صندوق كنز!  +%d ◆  +قدرات" % chest_reward, HORIZONTAL_ALIGNMENT_LEFT, 430, 18, Color("ffd45b"))
         if level_number in [3, 6, 9, 10]:
-            var epilogue := "العالم مكتمل! الطريق التالي مفتوح."
+            var epilogue := "العالم مكتمل! بوابة العالم التالي مفتوحة."
             if level_number == 10:
                 epilogue = "النهاية: سقط التنين وعادت المملكة إلى الأبطال."
-            draw_string(ThemeDB.fallback_font, Vector2(95, 635), epilogue, HORIZONTAL_ALIGNMENT_LEFT, 530, 16, Color("bfe7ff"))
-        draw_rect(Rect2(165, 650, 390, 70), Color("b98220"))
-        draw_string(ThemeDB.fallback_font, Vector2(250, 696), "CONTINUER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
+            draw_string(ThemeDB.fallback_font, Vector2(100, 665), epilogue, HORIZONTAL_ALIGNMENT_LEFT, 520, 16, Color("bfe7ff"))
+        draw_rect(Rect2(125, 710, 210, 65), Color("b98220"))
+        draw_string(ThemeDB.fallback_font, Vector2(173, 752), "الخريطة", HORIZONTAL_ALIGNMENT_LEFT, -1, 23, Color.WHITE)
+        draw_rect(Rect2(385, 710, 210, 65), Color("d09a31"))
+        draw_string(ThemeDB.fallback_font, Vector2(430, 752), "المستوى التالي", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color("2a1a0d"))
     else:
-        draw_string(ThemeDB.fallback_font, Vector2(210, 450), "NIVEAU ÉCHOUÉ", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, Color("ff927b"))
-        draw_string(ThemeDB.fallback_font, Vector2(205, 510), "Score : %d" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
-        draw_rect(Rect2(165, 650, 390, 70), Color("8e392d"))
-        draw_string(ThemeDB.fallback_font, Vector2(260, 696), "RÉESSAYER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
+        draw_string(ThemeDB.fallback_font, Vector2(205, 395), "TRY AGAIN", HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color("ff927b"))
+        draw_string(ThemeDB.fallback_font, Vector2(205, 445), "نفدت الحركات", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("f0d8c0"))
+        draw_string(ThemeDB.fallback_font, Vector2(205, 505), "Score : %d" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
+        draw_string(ThemeDB.fallback_font, Vector2(205, 550), "لا تزال أمامك فرصة لإعادة المحاولة.", HORIZONTAL_ALIGNMENT_LEFT, 340, 17, Color("cbbda8"))
+        draw_rect(Rect2(165, 650, 390, 75), Color("8e392d"))
+        draw_string(ThemeDB.fallback_font, Vector2(270, 698), "إعادة المحاولة", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
 
 func _handle_end_tap(pos: Vector2) -> void:
-    if pos.x < 110 or pos.x > 610 or pos.y < 620 or pos.y > 745:
+    if pos.y < 620 or pos.y > 800:
         return
     if level_lost:
+        screen_transition = 0.7
         _new_level()
         return
     if level_won:
+        if pos.x >= 385 and level_number < 10:
+            var next_level := level_number + 1
+            if _is_level_unlocked(next_level):
+                screen_mode = "level"
+                screen_transition = 1.0
+                result_timer = 0.0
+                _new_level()
+                return
         screen_mode = "map"
+        unlock_flash = 1.0
+        screen_transition = 0.8
         queue_redraw()
 
 func _refresh_daily_quest() -> void:
@@ -1342,6 +1401,9 @@ func _begin_boss_or_finish() -> void:
         _complete_level()
         return
     combat_active = true
+    boss_intro = 2.2
+    screen_shake = maxf(screen_shake, 0.18)
+    camera_zoom = 1.035
     snake_hp = boss_max_hp
     message = "BOSS: %s • اهزم الزعيم!" % _boss_name()
     var combat_tween := create_tween()
@@ -1709,8 +1771,11 @@ func _complete_level() -> void:
     coins += level_coins + chest_reward
     _check_star_chest_rewards()
     best_score = maxi(best_score, score)
+    var before_unlock_count := unlocked_levels.size()
     _unlock_after_level(level_number)
     unlocked_level = maxi(unlocked_level, level_number + 1)
+    if unlocked_levels.size() > before_unlock_count:
+        unlock_flash = 1.0
     campaign_complete = level_number >= 10
     _save_progress()
     rescue_celebration = 1.0
