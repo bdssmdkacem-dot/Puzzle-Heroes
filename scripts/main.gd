@@ -1,4 +1,4 @@
-extends Node2D
+extends Control
 
 # Puzzle Heroes - Level 1
 # Step 2: the Match-3 board now controls an adventure path.
