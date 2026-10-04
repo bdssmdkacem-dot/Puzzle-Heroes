@@ -322,6 +322,8 @@ func _draw_board() -> void:
 
     draw_rect(Rect2(32, 1248, 656, 32), Color("241c17"))
     draw_string(ThemeDB.fallback_font, Vector2(50, 1271), message, HORIZONTAL_ALIGNMENT_LEFT, 620, 16, Color.WHITE)
+    if combo > 1:
+        draw_string(ThemeDB.fallback_font, Vector2(500, 720), "COMBO x%d" % combo, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffdf62"))
 
 func _draw_gem(center: Vector2, value: int) -> void:
     if value >= 0 and value < COLORS.size():
