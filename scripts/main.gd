@@ -197,7 +197,7 @@ var sfx_cursor := 0
 
 func _ready() -> void:
     randomize()
-    # TEMP DIAGNOSTIC: Premium 10 combat nodes disabled until Android startup is verified.
+    _setup_combat_nodes()
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
@@ -2337,6 +2337,11 @@ func _prime_match_animation(matches: Array[Vector2i]) -> void:
             _spawn_vfx_ring(_cell_center(cell), 18.0, 62.0, Color(1.0, 0.88, 0.34, 0.9), 0.20)
 
 func _update_tile_animations(delta: float) -> void:
+    # The campaign map does not initialize level tile animation arrays.
+    # Skip level-only tile animation updates until a level is active.
+    if screen_mode != "level" or tile_offset.size() < ROWS or tile_scale.size() < ROWS:
+        collapse_animating = false
+        return
     var done := true
     for y in ROWS:
         for x in COLS:
