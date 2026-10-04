@@ -65,6 +65,18 @@ var hero_attack := 0.0
 var screen_shake := 0.0
 var cascade := 0
 var combo_flash := 0.0
+
+# Commercial tile animation state.
+var tile_offset: Array = []
+var tile_scale: Array = []
+var tile_alpha: Array = []
+var swap_animating := false
+var swap_a := Vector2i(-1, -1)
+var swap_b := Vector2i(-1, -1)
+var swap_anim_t := 1.0
+var swap_rejected := false
+var collapse_animating := false
+var booster_paths: Array = []
 var goal_kind := "rocks"
 var goal_target := 4
 var goal_progress := 0
@@ -96,11 +108,20 @@ func _process(delta: float) -> void:
     hero_attack = maxf(0.0, hero_attack - delta * 3.8)
     screen_shake = maxf(0.0, screen_shake - delta * 4.0)
     combo_flash = maxf(0.0, combo_flash - delta * 2.8)
+    _update_tile_animations(delta)
+    _update_booster_paths(delta)
     _update_effects(delta)
     queue_redraw()
 
 func _new_level() -> void:
     board.clear()
+    tile_offset.clear()
+    tile_scale.clear()
+    tile_alpha.clear()
+    for y in ROWS:
+        tile_offset.append([])
+        tile_scale.append([])
+        tile_alpha.append([])
     for y in ROWS:
         var row: Array = []
         for x in COLS:
@@ -110,6 +131,9 @@ func _new_level() -> void:
             while y >= 2 and board[y - 1][x] == value and board[y - 2][x] == value:
                 value = randi() % COLORS.size()
             row.append(value)
+            tile_offset[y].append(Vector2.ZERO)
+            tile_scale[y].append(1.0)
+            tile_alpha[y].append(1.0)
         board.append(row)
 
     score = 0
@@ -139,6 +163,9 @@ func _new_level() -> void:
     refill_anim = 1.0
     hero_attack = 0.0
     screen_shake = 0.0
+    swap_animating = false
+    collapse_animating = false
+    booster_paths.clear()
 
     _configure_level_goal()
     message = _level_objective()
@@ -310,20 +337,47 @@ func _draw_board() -> void:
     draw_rect(Rect2(24, 666, 672, 580), Color("b98628"))
     draw_rect(Rect2(32, 674, 656, 564), Color("e8d4a7"))
     draw_string(ThemeDB.fallback_font, Vector2(48, 698), "MATCH 3", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("68451d"))
+
     for y in ROWS:
         for x in COLS:
             var rect := Rect2(BOARD_X + x * CELL, BOARD_Y + y * CELL, CELL - 5, CELL - 5)
             draw_style_box(_cell_box(), rect)
+
+    for y in ROWS:
+        for x in COLS:
             var value: int = board[y][x]
-            var center := rect.get_center()
-            if refill_anim < 1.0:
-                center.y -= (1.0 - refill_anim) * float((ROWS - y) * 46)
-            _draw_gem(center, value)
+            if value < 0:
+                continue
+            var center := Vector2(BOARD_X + x * CELL + (CELL - 5) * 0.5, BOARD_Y + y * CELL + (CELL - 5) * 0.5)
+            center += tile_offset[y][x]
+            _draw_gem_animated(center, value, tile_scale[y][x], tile_alpha[y][x])
+
+    if swap_animating and _inside(swap_a) and _inside(swap_b):
+        var va: int = board[swap_a.y][swap_a.x]
+        var vb: int = board[swap_b.y][swap_b.x]
+        var ca := Vector2(BOARD_X + swap_a.x * CELL + (CELL - 5) * 0.5, BOARD_Y + swap_a.y * CELL + (CELL - 5) * 0.5)
+        var cb := Vector2(BOARD_X + swap_b.x * CELL + (CELL - 5) * 0.5, BOARD_Y + swap_b.y * CELL + (CELL - 5) * 0.5)
+        var t := clampf(swap_anim_t, 0.0, 1.0)
+        var pa := ca.lerp(cb, t)
+        var pb := cb.lerp(ca, t)
+        var bounce := sin(t * PI) * (7.0 if swap_rejected else 3.0)
+        _draw_gem_animated(pa + Vector2(0, bounce), va, 1.04, 1.0)
+        _draw_gem_animated(pb - Vector2(0, bounce), vb, 1.04, 1.0)
+
+    for path in booster_paths:
+        _draw_booster_path(path)
 
     draw_rect(Rect2(32, 1248, 656, 32), Color("241c17"))
     draw_string(ThemeDB.fallback_font, Vector2(50, 1271), message, HORIZONTAL_ALIGNMENT_LEFT, 620, 16, Color.WHITE)
     if combo > 1:
         draw_string(ThemeDB.fallback_font, Vector2(500, 720), "COMBO x%d" % combo, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffdf62"))
+
+func _draw_gem_animated(center: Vector2, value: int, scale: float, alpha: float) -> void:
+    var old_modulate := modulate
+    modulate = Color(1, 1, 1, clampf(alpha, 0.0, 1.0))
+    _draw_gem(center, value)
+    modulate = old_modulate
+
 
 func _draw_gem(center: Vector2, value: int) -> void:
     if value >= 0 and value < COLORS.size():
@@ -430,28 +484,46 @@ func _inside(cell: Vector2i) -> bool:
     return cell.x >= 0 and cell.x < COLS and cell.y >= 0 and cell.y < ROWS
 
 func _try_swap(a: Vector2i, b: Vector2i) -> void:
+    busy = true
     _swap(a, b)
+    await _play_swap_animation(a, b, false)
+
     var has_special := _is_special(board[a.y][a.x]) or _is_special(board[b.y][b.x])
     var matches := _activate_special_swap(a, b) if has_special else _find_matches()
 
     if matches.is_empty():
+        await _play_swap_animation(a, b, true)
         _swap(a, b)
+        swap_animating = false
         combo = 0
         cascade = 0
         message = "Pas de combinaison : essaie un autre mouvement."
+        busy = false
         queue_redraw()
         return
 
     moves -= 1
-    busy = true
     cascade = 0
     combo = 0
-    _resolve_cascade(matches)
+    await _resolve_cascade(matches)
     if moves <= 0 and not level_won:
         level_lost = true
         message = "Niveau échoué • touche pour réessayer"
     busy = false
     queue_redraw()
+
+func _play_swap_animation(a: Vector2i, b: Vector2i, rejected: bool) -> void:
+    swap_a = a
+    swap_b = b
+    swap_rejected = rejected
+    swap_animating = true
+    swap_anim_t = 0.0
+    var tween := create_tween()
+    tween.tween_property(self, "swap_anim_t", 1.0, 0.14 if not rejected else 0.11).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    await tween.finished
+    if not rejected:
+        swap_animating = false
+
 
 func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
     var matches := initial_matches
@@ -480,6 +552,8 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             goal_progress = mini(goal_target, goal_progress + 1)
 
         message = "COMBO x%d  +%d" % [combo, points]
+        _prime_match_animation(matches)
+        await get_tree().create_timer(0.11).timeout
         _spawn_match_bursts(matches)
         _clear_matches(matches, special_cell, special_value)
         _apply_adventure_damage(matches.size())
@@ -746,14 +820,64 @@ func _complete_level() -> void:
 
 
 func _collapse() -> void:
+    collapse_animating = true
     for x in COLS:
+        var old_values: Array = []
+        for y in ROWS:
+            old_values.append(board[y][x])
+
         var values: Array = []
         for y in ROWS:
             if board[y][x] >= 0:
                 values.append(board[y][x])
 
+        var missing := ROWS - values.size()
         while values.size() < ROWS:
             values.push_front(randi() % COLORS.size())
 
         for y in ROWS:
             board[y][x] = values[y]
+            tile_scale[y][x] = 0.92
+            tile_alpha[y][x] = 1.0
+            var source_index := -1
+            for oy in range(ROWS):
+                if old_values[oy] == values[y] and old_values[oy] >= 0:
+                    source_index = oy
+                    old_values[oy] = -2
+                    break
+            if source_index >= 0:
+                tile_offset[y][x] = Vector2(0, (source_index - y) * CELL)
+            else:
+                tile_offset[y][x] = Vector2(0, -(missing + 1) * CELL)
+
+func _prime_match_animation(matches: Array[Vector2i]) -> void:
+    for cell in matches:
+        if _inside(cell):
+            tile_scale[cell.y][cell.x] = 1.12
+
+func _update_tile_animations(delta: float) -> void:
+    var done := true
+    for y in ROWS:
+        for x in COLS:
+            tile_offset[y][x] = tile_offset[y][x].lerp(Vector2.ZERO, minf(1.0, delta * 10.0))
+            tile_scale[y][x] = lerpf(tile_scale[y][x], 1.0, minf(1.0, delta * 12.0))
+            if tile_offset[y][x].length() > 0.5 or absf(tile_scale[y][x] - 1.0) > 0.02:
+                done = false
+    collapse_animating = not done
+
+func _update_booster_paths(delta: float) -> void:
+    for i in range(booster_paths.size() - 1, -1, -1):
+        var path: Dictionary = booster_paths[i]
+        path["t"] = float(path["t"]) + delta
+        booster_paths[i] = path
+        if float(path["t"]) >= float(path["life"]):
+            booster_paths.remove_at(i)
+
+func _draw_booster_path(path: Dictionary) -> void:
+    var from: Vector2 = path["from"]
+    var to: Vector2 = path["to"]
+    var life := clampf(1.0 - float(path["t"]) / float(path["life"]), 0.0, 1.0)
+    var p := from.lerp(to, clampf(float(path["t"]) / float(path["life"]), 0.0, 1.0))
+    draw_line(from, p, Color(1.0, 0.88, 0.3, life * 0.55), 12.0)
+    draw_line(from, p, Color(1.0, 1.0, 0.78, life), 4.0)
+    draw_circle(p, 10.0 + 6.0 * life, Color(1.0, 0.82, 0.2, life * 0.9))
