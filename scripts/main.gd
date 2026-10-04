@@ -50,6 +50,15 @@ var snake_x := PATH_POINTS[-1].x
 var snake_alert := 0.0
 var obstacle_flash := 0.0
 var last_match_count := 0
+var attack_flash := 0.0
+var rescue_open := false
+var effects: Array = []
+
+const HERO_TEX := preload("res://assets/art/hero.svg")
+const SNAKE_TEX := preload("res://assets/art/snake.svg")
+const ROCK_TEX := preload("res://assets/art/rock.svg")
+const CAPTIVE_TEX := preload("res://assets/art/captive.svg")
+const SCENE_TEX := preload("res://assets/art/scene.svg")
 
 func _ready() -> void:
     randomize()
@@ -60,6 +69,8 @@ func _process(delta: float) -> void:
     hero_bounce += delta * 5.0
     snake_alert = maxf(0.0, snake_alert - delta * 2.5)
     obstacle_flash = maxf(0.0, obstacle_flash - delta * 3.5)
+    attack_flash = maxf(0.0, attack_flash - delta * 4.0)
+    _update_effects(delta)
     queue_redraw()
 
 func _new_level() -> void:
@@ -89,6 +100,9 @@ func _new_level() -> void:
     snake_alert = 0.0
     obstacle_flash = 0.0
     last_match_count = 0
+    attack_flash = 0.0
+    rescue_open = false
+    effects.clear()
 
     message = "Aligne 3 tuiles pour casser le rocher !"
     level_won = false
@@ -138,24 +152,11 @@ func _draw() -> void:
         HORIZONTAL_ALIGNMENT_LEFT, 610, 21, Color.WHITE)
 
 func _draw_adventure_area() -> void:
-    # Original illustrated adventure scene: no external art required.
-    draw_rect(Rect2(32, 190, 656, 292), Color("6d533b"))
-    draw_rect(Rect2(42, 200, 636, 272), Color("86b95c"))
+    # Professional original 2D scene artwork.
+    draw_rect(Rect2(32, 190, 656, 292), Color("4b382d"))
+    draw_texture_rect(SCENE_TEX, Rect2(42, 200, 636, 272), false)
 
-    # Sky and distant hills.
-    draw_rect(Rect2(42, 200, 636, 135), Color("9ed8f2"))
-    draw_circle(Vector2(590, 235), 42, Color("ffe18a"))
-    draw_colored_polygon(PackedVector2Array([
-        Vector2(42, 330), Vector2(170, 255), Vector2(285, 330),
-        Vector2(430, 245), Vector2(678, 325), Vector2(678, 350), Vector2(42, 350)
-    ]), Color("6c9b57"))
-
-    # Ground.
-    draw_colored_polygon(PackedVector2Array([
-        Vector2(42, 330), Vector2(678, 330), Vector2(678, 472), Vector2(42, 472)
-    ]), Color("7f9d4d"))
-
-    # Adventure path.
+    # Adventure path is drawn over the scene to keep gameplay readable.
     for i in range(PATH_POINTS.size() - 1):
         draw_line(PATH_POINTS[i], PATH_POINTS[i + 1], Color("d6b77b"), 30.0)
         draw_line(PATH_POINTS[i], PATH_POINTS[i + 1], Color("ead49b"), 22.0)
@@ -185,6 +186,12 @@ func _draw_adventure_area() -> void:
     # Snake enemy on the far side.
     _draw_snake(Vector2(snake_x, 285 + sin(hero_bounce * 0.7) * 4.0))
 
+    # Captive appears at the exit and is rescued after the final obstacle.
+    if level_won or rescue_open:
+        draw_texture_rect(CAPTIVE_TEX, Rect2(Vector2(610, 325), Vector2(58, 79)), false)
+
+    _draw_effects()
+
     # Hero follows the unlocked path.
     var hero_offset := Vector2(0, sin(hero_bounce) * 3.0)
     _draw_hero(Vector2(hero_x, hero_y) + hero_offset)
@@ -208,60 +215,28 @@ func _draw_adventure_area() -> void:
 
 func _draw_obstacle(pos: Vector2, index: int) -> void:
     if index >= obstacle_hp.size() or obstacle_hp[index] <= 0:
-        # Broken rocks become a small dust pile.
-        draw_circle(pos + Vector2(-12, 5), 8, Color("bca675"))
-        draw_circle(pos + Vector2(8, 7), 6, Color("a78e64"))
+        draw_circle(pos + Vector2(-12, 5), 9, Color("bca675"))
+        draw_circle(pos + Vector2(10, 7), 7, Color("a78e64"))
+        draw_line(pos + Vector2(-18, -2), pos + Vector2(18, 7), Color("d8c79e"), 3)
         return
 
     var hp: int = obstacle_hp[index]
     var shake := sin(obstacle_flash * 28.0 + float(index)) * 5.0 if obstacle_flash > 0.0 else 0.0
     var p := pos + Vector2(shake, 0)
-
-    draw_circle(p, 31, Color("4e463d"))
-    draw_colored_polygon(PackedVector2Array([
-        p + Vector2(-27, 16), p + Vector2(-34, -8), p + Vector2(-14, -30),
-        p + Vector2(15, -28), p + Vector2(34, -5), p + Vector2(24, 21),
-        p + Vector2(-2, 32)
-    ]), Color("80776a"))
-    draw_line(p + Vector2(-13, -14), p + Vector2(4, -3), Color("a9a092"), 4)
-    draw_line(p + Vector2(4, -3), p + Vector2(13, 13), Color("a9a092"), 3)
-
-    # HP pips.
+    draw_texture_rect(ROCK_TEX, Rect2(p - Vector2(43, 43), Vector2(86, 86)), false)
     for h in hp:
-        draw_circle(p + Vector2((h - 1) * 14.0 - 7.0, -49), 5, Color("e64e45"))
+        draw_circle(p + Vector2((h - 1) * 16.0 - 8.0, -53), 6, Color("ef4f48"))
 
 func _draw_hero(pos: Vector2) -> void:
-    # Original simple hero silhouette.
-    draw_ellipse(pos + Vector2(0, 30), Vector2(27, 10), Color(0.1, 0.16, 0.22, 0.28))
-    draw_circle(pos + Vector2(0, -22), 18, Color("f2c39b"))
-    draw_colored_polygon(PackedVector2Array([
-        pos + Vector2(-19, -30),
-        pos + Vector2(0, -52),
-        pos + Vector2(20, -30)
-    ]), Color("d34e45"))
-    draw_colored_polygon(PackedVector2Array([
-        pos + Vector2(-24, 2),
-        pos + Vector2(24, 2),
-        pos + Vector2(16, 31),
-        pos + Vector2(-16, 31)
-    ]), Color("315d9c"))
-    draw_line(pos + Vector2(-12, 8), pos + Vector2(-27, 23), Color("f2c39b"), 7)
-    draw_line(pos + Vector2(12, 8), pos + Vector2(28, 0), Color("f2c39b"), 7)
-    draw_line(pos + Vector2(-9, 29), pos + Vector2(-13, 48), Color("30343c"), 8)
-    draw_line(pos + Vector2(9, 29), pos + Vector2(14, 48), Color("30343c"), 8)
-    draw_circle(pos + Vector2(-6, -24), 2.5, Color("252525"))
-    draw_circle(pos + Vector2(6, -24), 2.5, Color("252525"))
+    var scale := Vector2(0.72, 0.72)
+    draw_texture_rect(HERO_TEX, Rect2(pos - Vector2(43, 58), Vector2(86, 108)), false)
+    if attack_flash > 0.0:
+        draw_line(pos + Vector2(25, -4), pos + Vector2(68, -24), Color(1, 0.88, 0.35, attack_flash), 8)
+        draw_line(pos + Vector2(33, 4), pos + Vector2(76, -14), Color(1, 1, 1, attack_flash * 0.8), 3)
 
 func _draw_snake(pos: Vector2) -> void:
-    var alert := snake_alert * 7.0
-    draw_circle(pos + Vector2(0, 32), 31, Color(0.1, 0.18, 0.1, 0.25))
-    draw_circle(pos + Vector2(-22, 0), 22, Color("356b3e"))
-    draw_circle(pos + Vector2(0, 7), 24, Color("3f8248"))
-    draw_circle(pos + Vector2(21, -1), 22 + alert, Color("4a914f"))
-    draw_circle(pos + Vector2(31, -5), 17 + alert, Color("55a45a"))
-    draw_circle(pos + Vector2(37, -10), 3.5, Color("f4d34e"))
-    draw_circle(pos + Vector2(37, -10), 1.5, Color("191919"))
-    draw_line(pos + Vector2(46, 2), pos + Vector2(64, 5), Color("e35b51"), 3)
+    var shake := sin(hero_bounce * 12.0) * snake_alert * 5.0
+    draw_texture_rect(SNAKE_TEX, Rect2(pos + Vector2(-58 + shake, -42), Vector2(116, 82)), false)
 
 func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
     var points := PackedVector2Array()
@@ -359,6 +334,7 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     _clear_matches(matches)
     _collapse()
 
+    _spawn_attack_effects(matches.size())
     _apply_adventure_damage(matches.size())
 
     if moves <= 0 and not level_won:
@@ -381,6 +357,7 @@ func _apply_adventure_damage(match_count: int) -> void:
 
     obstacle_hp[obstacle_index] = max(0, obstacle_hp[obstacle_index] - damage)
     obstacle_flash = 1.0
+    attack_flash = 1.0
     snake_alert = 1.0
 
     if obstacle_hp[obstacle_index] > 0:
@@ -397,7 +374,8 @@ func _apply_adventure_damage(match_count: int) -> void:
 
     if hero_progress >= PATH_POINTS.size() - 1:
         level_won = true
-        message = "Victoire ! Le héros a traversé le chemin."
+        rescue_open = true
+        message = "SAUVETAGE RÉUSSI ! Le héros libère son allié."
         var win_tween := create_tween()
         win_tween.set_parallel(true)
         win_tween.tween_property(self, "hero_x", PATH_POINTS[-1].x, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -411,6 +389,42 @@ func _apply_adventure_damage(match_count: int) -> void:
     hero_tween.tween_property(self, "hero_y", target.y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
     message = "ROCHER DÉTRUIT ! Le héros avance."
+
+func _spawn_attack_effects(match_count: int) -> void:
+    var origin := Vector2(hero_x + 28, hero_y - 8)
+    var target := (PATH_POINTS[obstacle_index] + PATH_POINTS[obstacle_index + 1]) * 0.5 if obstacle_index < PATH_POINTS.size() - 1 else origin
+    for i in range(mini(14, 5 + match_count * 2)):
+        var angle := TAU * float(i) / float(maxi(1, 5 + match_count * 2))
+        effects.append({
+            "p": origin,
+            "v": Vector2(cos(angle), sin(angle)) * (90.0 + randi() % 100),
+            "t": 0.0,
+            "life": 0.45 + float(randi() % 30) / 100.0,
+            "target": target
+        })
+
+func _update_effects(delta: float) -> void:
+    for i in range(effects.size() - 1, -1, -1):
+        var e: Dictionary = effects[i]
+        e["t"] = float(e["t"]) + delta
+        e["p"] = Vector2(e["p"]) + Vector2(e["v"]) * delta
+        e["v"] = Vector2(e["v"]) * 0.91
+        effects[i] = e
+        if float(e["t"]) >= float(e["life"]):
+            effects.remove_at(i)
+
+func _draw_effects() -> void:
+    for e in effects:
+        var life := maxf(0.0, 1.0 - float(e["t"]) / float(e["life"]))
+        var p := Vector2(e["p"])
+        draw_circle(p, 5.0 + 6.0 * life, Color(1.0, 0.78, 0.2, life))
+        draw_circle(p, 2.5, Color(1, 1, 1, life))
+
+func _draw_rescue_badge() -> void:
+    if not rescue_open:
+        return
+    draw_circle(Vector2(590, 225), 34, Color(0.12, 0.55, 0.28, 0.9))
+    draw_string(ThemeDB.fallback_font, Vector2(567, 233), "✓", HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color.WHITE)
 
 func _swap(a: Vector2i, b: Vector2i) -> void:
     var tmp = board[a.y][a.x]
