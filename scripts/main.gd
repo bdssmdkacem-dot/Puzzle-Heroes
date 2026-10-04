@@ -33,6 +33,7 @@ var moves := 25
 var dragging := false
 var drag_start := Vector2.ZERO
 var drag_cell := Vector2i(-1, -1)
+var active_touch_index := -1
 var busy := false
 
 var message := "Aligne 3 tuiles pour casser le rocher !"
@@ -276,19 +277,24 @@ func _input(event: InputEvent) -> void:
     if busy:
         return
 
-    # Android / iOS touch.
+    # Android / iOS touch. Normalize to the 720x1280 design space.
     if event is InputEventScreenTouch:
-        if event.pressed:
-            drag_start = event.position
-            drag_cell = _screen_to_cell(event.position)
+        if event.pressed and active_touch_index == -1:
+            active_touch_index = event.index
+            drag_start = _input_to_design(event.position)
+            drag_cell = _screen_to_cell(drag_start)
             dragging = drag_cell.x >= 0
-        elif dragging:
-            _finish_drag(event.position)
+        elif not event.pressed and event.index == active_touch_index:
+            if dragging:
+                _finish_drag(_input_to_design(event.position))
+            dragging = false
+            active_touch_index = -1
 
-    elif event is InputEventScreenDrag and dragging:
-        var delta: Vector2 = event.position - drag_start
-        if delta.length() >= 34.0:
-            _finish_drag(event.position)
+    elif event is InputEventScreenDrag and dragging and event.index == active_touch_index:
+        var current_pos: Vector2 = _input_to_design(event.position)
+        var delta: Vector2 = current_pos - drag_start
+        if delta.length() >= 28.0:
+            _finish_drag(current_pos)
 
     # Mouse input is useful for desktop testing.
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -322,6 +328,12 @@ func _finish_drag(pos: Vector2) -> void:
             end_cell = drag_cell + Vector2i(0, sign(d.y))
     if _inside(end_cell):
         _try_swap(drag_cell, end_cell)
+
+func _input_to_design(pos: Vector2) -> Vector2:
+    var viewport_size := get_viewport().get_visible_rect().size
+    if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+        return pos
+    return Vector2(pos.x * 720.0 / viewport_size.x, pos.y * 1280.0 / viewport_size.y)
 
 func _screen_to_cell(pos: Vector2) -> Vector2i:
     var x := int(floor((pos.x - BOARD_X) / CELL))
