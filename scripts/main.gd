@@ -1098,7 +1098,7 @@ func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
     draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw_campaign_map() -> void:
-    _ensure_art_assets()
+    # Keep the campaign map completely asset-free at startup. Heavy SVG art is loaded only when entering a level/story.
     _draw_map_landscape()
 
     # Darkened top/bottom chrome keeps the landscape visible while making the HUD readable.
@@ -1110,8 +1110,13 @@ func _draw_campaign_map() -> void:
     _map_panel(Rect2(18,18,292,116),Color(0.03,0.10,0.17,0.88),Color("e4ad3b"),3)
     draw_circle(Vector2(70,76),49,Color("e6ad3b"))
     draw_circle(Vector2(70,76),43,Color("182d40"))
-    if HERO_PRO_TEX:
-        draw_texture_rect(HERO_PRO_TEX,Rect2(35,36,70,82),false)
+    # Procedural hero portrait keeps startup independent from SVG imports.
+    draw_circle(Vector2(70,76),34,Color("9b5b37"))
+    draw_circle(Vector2(70,66),22,Color("5a3425"))
+    draw_colored_polygon(PackedVector2Array([Vector2(49,58),Vector2(70,38),Vector2(91,58),Vector2(82,48),Vector2(58,48)]),Color("4a2a20"))
+    draw_circle(Vector2(62,66),3,Color("f5dfb0"))
+    draw_circle(Vector2(78,66),3,Color("f5dfb0"))
+    draw_line(Vector2(63,82),Vector2(77,82),Color("d47c58"),3)
     draw_rect(Rect2(120,35,88,34),Color("15518a"),true)
     draw_rect(Rect2(120,35,88,34),Color("e4ad3b"),false,3)
     draw_string(ThemeDB.fallback_font,Vector2(139,59),"Lv. 1",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color.WHITE)
