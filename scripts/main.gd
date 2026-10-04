@@ -1226,12 +1226,6 @@ func _handle_map_tap(pos: Vector2) -> void:
         _start_level(unlocked_level)
         return
 
-func _handle_map_tap(pos: Vector2) -> void:
-    var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
-    for i in range(nodes.size()):
-        if pos.distance_to(nodes[i]) <= 58.0:
-            _start_level(i + 1)
-            return
 
 func _draw_boss_cinematic() -> void:
     var t := clampf(boss_intro / 2.2, 0.0, 1.0)
