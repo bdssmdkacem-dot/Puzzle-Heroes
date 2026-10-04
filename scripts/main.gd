@@ -300,7 +300,7 @@ func _configure_level_goal() -> void:
             goal_target = 2
         _:
             goal_kind = "rocks"
-            goal_target = 4
+            goal_target = obstacle_hp.size()
 
 func _level_objective() -> String:
     match goal_kind:
@@ -464,7 +464,7 @@ func _draw_top_hud() -> void:
     draw_rect(Rect2(0, 0, 720, 92), Color("2a211b"))
     draw_rect(Rect2(0, 88, 720, 7), Color("e9b62f"))
     draw_string(ThemeDB.fallback_font, Vector2(30, 38), "PUZZLE HEROES", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("fff4d0"))
-    draw_string(ThemeDB.fallback_font, Vector2(30, 68), "NIVEAU %d" % level_number, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("d7c29a"))
+    draw_string(ThemeDB.fallback_font, Vector2(30, 68), "NIVEAU %d • %s" % [level_number, level_modifier], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("d7c29a"))
     draw_circle(Vector2(552, 43), 18, Color("e9b62f"))
     draw_string(ThemeDB.fallback_font, Vector2(544, 51), "★", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("5a3b10"))
     draw_string(ThemeDB.fallback_font, Vector2(580, 51), str(score), HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color.WHITE)
@@ -551,7 +551,15 @@ func _draw_large_snake(pos: Vector2) -> void:
     var size := Vector2(600, 300) * scale
     var p := pos + Vector2(recoil + shake, boss_bob)
     size *= boss_pulse_scale
+    var old_modulate := modulate
+    if boss_kind == "guardian":
+        modulate = Color(0.55, 0.72, 1.0, 1.0)
+    elif boss_kind == "beast":
+        modulate = Color(0.82, 0.48, 0.36, 1.0)
+    elif boss_kind == "dragon":
+        modulate = Color(0.72, 0.42, 0.95, 1.0)
     draw_texture_rect(SNAKE_TEX, Rect2(p - size * 0.5, size), false)
+    modulate = old_modulate
     if combat_active:
         draw_arc(p + Vector2(145, 35), 188.0 + sin(snake_boss_phase * 2.0) * 8.0, PI * 0.15, PI * 0.85, 28, Color(1.0, 0.32, 0.16, 0.22), 8.0)
         draw_string(ThemeDB.fallback_font, p + Vector2(-155, -120), "BOSS • " + _boss_name(), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.46, 0.28, 0.88))
