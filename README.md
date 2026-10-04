@@ -2,7 +2,7 @@
 
 Original portrait puzzle-adventure game built with Godot 4.
 
-## Level 1 — Puzzle controls the adventure
+## Level 1 — Puzzle controls the adventure\n\n### Step 3 — 2D art, combat and rescue
 
 The game is intentionally more than a Match-3 board: every successful combination changes the adventure scene.
 
@@ -36,7 +36,7 @@ The game is intentionally more than a Match-3 board: every successful combinatio
 6. The hero walks forward.
 7. Repeat until the exit is reached.
 
-This establishes the core puzzle-adventure loop before adding final character art, richer obstacles, enemies, effects, sound, and multiple levels.
+This establishes the core puzzle-adventure loop with original 2D artwork and a complete rescue encounter.\n\n### Step 3 features\n\n- Original SVG artwork for the hero, snake, rocks, environment and captive.\n- Hero movement between path checkpoints.\n- Attack burst particles and hit flashes triggered by Match-3 combinations.\n- Destructible rocks remain the first combat layer.\n- After the final rock, the game enters a dedicated snake combat phase.\n- The snake has 5 HP; larger Match-3 combinations deal more damage.\n- The hero cannot win until the snake is defeated.\n- After victory, the captive appears and the hero moves in for the rescue.\n- The final objective is now: clear the path → fight the snake → rescue the captive.\n\nThe visual implementation uses Godot 2D drawing and SVG textures so the prototype can evolve into Sprite2D/AnimatedSprite2D assets later without changing the gameplay architecture.
 
 ## Android
 
