@@ -24,6 +24,14 @@ const OBSTACLE_MAX_HP := [2, 2, 3, 2]
 var board: Array = []
 var score := 0
 var moves := 25
+var level_number := 1
+var unlocked_level := 1
+var stars := 0
+var coins := 0
+var level_coins := 0
+var combo := 0
+var best_score := 0
+var campaign_complete := false
 
 var dragging := false
 var drag_start := Vector2.ZERO
@@ -54,6 +62,7 @@ var snake_hit_flash := 0.0
 var effects: Array = []
 var refill_anim := 1.0
 var hero_attack := 0.0
+var screen_shake := 0.0
 
 const HERO_TEX := preload("res://assets/art/hero.svg")
 const SNAKE_TEX := preload("res://assets/art/snake.svg")
@@ -64,6 +73,7 @@ const GEMS_TEX := preload("res://assets/art/gems.svg")
 
 func _ready() -> void:
     randomize()
+    _load_progress()
     _new_level()
     queue_redraw()
 
@@ -75,6 +85,7 @@ func _process(delta: float) -> void:
     snake_hit_flash = maxf(0.0, snake_hit_flash - delta * 5.0)
     refill_anim = minf(1.0, refill_anim + delta * 3.8)
     hero_attack = maxf(0.0, hero_attack - delta * 3.8)
+    screen_shake = maxf(0.0, screen_shake - delta * 4.0)
     _update_effects(delta)
     queue_redraw()
 
@@ -92,7 +103,9 @@ func _new_level() -> void:
         board.append(row)
 
     score = 0
-    moves = 25
+    moves = 24 + level_number * 2
+    level_coins = 0
+    combo = 0
     obstacle_hp.clear()
     for hp in OBSTACLE_MAX_HP:
         obstacle_hp.append(hp)
@@ -113,8 +126,9 @@ func _new_level() -> void:
     effects.clear()
     refill_anim = 1.0
     hero_attack = 0.0
+    screen_shake = 0.0
 
-    message = "Aligne 3 tuiles pour casser le rocher !"
+    message = _level_objective()
     level_won = false
     level_lost = false
     busy = false
@@ -127,15 +141,78 @@ func _draw() -> void:
     _draw_board()
     _draw_effects()
     _draw_rescue_badge()
+    if level_won or level_lost:
+        _draw_end_panel()
+
+func _level_objective() -> String:
+    match level_number:
+        1: return "CASSE LE MUR"
+        2: return "PROTÈGE LE HÉROS"
+        3: return "ATTEINS LE SERPENT"
+        4: return "LIBÈRE LE PRISONNIER"
+        5: return "TRAVERSE LE TEMPLE"
+        6: return "BRISE LA PORTE"
+        7: return "SAUVE LE COMPAGNON"
+        8: return "DÉFIE LE GARDIEN"
+        9: return "OUVRE LA SORTIE"
+        _: return "DERNIER COMBAT"
+
+func _draw_end_panel() -> void:
+    draw_rect(Rect2(55, 350, 610, 430), Color(0.06, 0.04, 0.03, 0.96))
+    draw_rect(Rect2(62, 357, 596, 416), Color("6d4a24"), false, 5)
+    if level_won:
+        draw_string(ThemeDB.fallback_font, Vector2(175, 430), "NIVEAU RÉUSSI !", HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color("ffe17a"))
+        var earned := 3 if moves >= 12 else (2 if moves >= 6 else 1)
+        draw_string(ThemeDB.fallback_font, Vector2(220, 490), "★".repeat(earned), HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("ffd34d"))
+        draw_string(ThemeDB.fallback_font, Vector2(190, 545), "%d points" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
+        draw_string(ThemeDB.fallback_font, Vector2(190, 585), "+%d ◆" % (level_coins + earned * 5), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffe17a"))
+        draw_rect(Rect2(165, 650, 390, 70), Color("b98220"))
+        draw_string(ThemeDB.fallback_font, Vector2(250, 696), "CONTINUER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
+    else:
+        draw_string(ThemeDB.fallback_font, Vector2(210, 450), "NIVEAU ÉCHOUÉ", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, Color("ff927b"))
+        draw_string(ThemeDB.fallback_font, Vector2(205, 510), "Score : %d" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
+        draw_rect(Rect2(165, 650, 390, 70), Color("8e392d"))
+        draw_string(ThemeDB.fallback_font, Vector2(260, 696), "RÉESSAYER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
+
+func _handle_end_tap(pos: Vector2) -> void:
+    if pos.x < 145 or pos.x > 575 or pos.y < 630 or pos.y > 735:
+        return
+    if level_lost:
+        _new_level()
+        return
+    if level_won:
+        if level_number < unlocked_level and level_number < 10:
+            level_number += 1
+            _new_level()
+        else:
+            level_number = 1
+            _new_level()
+
+func _save_progress() -> void:
+    var cfg := ConfigFile.new()
+    cfg.set_value("campaign", "unlocked_level", unlocked_level)
+    cfg.set_value("campaign", "stars", stars)
+    cfg.set_value("campaign", "coins", coins)
+    cfg.set_value("campaign", "best_score", best_score)
+    cfg.save("user://puzzle_heroes.cfg")
+
+func _load_progress() -> void:
+    var cfg := ConfigFile.new()
+    if cfg.load("user://puzzle_heroes.cfg") == OK:
+        unlocked_level = int(cfg.get_value("campaign", "unlocked_level", 1))
+        stars = int(cfg.get_value("campaign", "stars", 0))
+        coins = int(cfg.get_value("campaign", "coins", 0))
+        best_score = int(cfg.get_value("campaign", "best_score", 0))
 
 func _draw_top_hud() -> void:
     draw_rect(Rect2(0, 0, 720, 92), Color("2a211b"))
     draw_rect(Rect2(0, 88, 720, 7), Color("e9b62f"))
     draw_string(ThemeDB.fallback_font, Vector2(30, 38), "PUZZLE HEROES", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("fff4d0"))
-    draw_string(ThemeDB.fallback_font, Vector2(30, 68), "NIVEAU 1", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("d7c29a"))
+    draw_string(ThemeDB.fallback_font, Vector2(30, 68), "NIVEAU %d" % level_number, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("d7c29a"))
     draw_circle(Vector2(552, 43), 18, Color("e9b62f"))
     draw_string(ThemeDB.fallback_font, Vector2(544, 51), "★", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("5a3b10"))
     draw_string(ThemeDB.fallback_font, Vector2(580, 51), str(score), HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color.WHITE)
+    draw_string(ThemeDB.fallback_font, Vector2(450, 78), "◆ %d" % coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe17a"))
     draw_rect(Rect2(625, 23, 65, 42), Color("49372a"))
     draw_string(ThemeDB.fallback_font, Vector2(637, 51), str(moves), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("fff1bd"))
 
@@ -187,7 +264,7 @@ func _draw_rescue_scene() -> void:
 
     # Objective badge.
     draw_rect(Rect2(250, 120, 220, 42), Color(0.05, 0.04, 0.03, 0.86))
-    var objective := "COMBAT !" if combat_active else ("SAUVETAGE !" if level_won else "CASSE LE MUR")
+    var objective := "COMBAT !" if combat_active else ("SAUVETAGE !" if level_won else _level_objective())
     draw_string(ThemeDB.fallback_font, Vector2(280, 148), objective, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("ffe6a1"))
 
 func _draw_hero(pos: Vector2) -> void:
@@ -236,6 +313,12 @@ func _cell_box() -> StyleBoxFlat:
     return box
 
 func _input(event: InputEvent) -> void:
+    if level_won or level_lost:
+        if event is InputEventScreenTouch and event.pressed:
+            _handle_end_tap(_input_to_design(event.position))
+        elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+            _handle_end_tap(event.position)
+        return
     if busy:
         return
 
@@ -312,14 +395,18 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
 
     if matches.is_empty():
         _swap(a, b)
+        combo = 0
         message = "Pas de combinaison : essaie un autre mouvement."
         queue_redraw()
         return
 
     moves -= 1
+    combo += 1
     last_match_count = matches.size()
-    var points := matches.size() * 10
+    var multiplier := 1 + mini(combo - 1, 3)
+    var points := matches.size() * 10 * multiplier
     score += points
+    level_coins += maxi(1, matches.size() / 3)
 
     busy = true
     message = "+%d points • attaque l'obstacle !" % points
@@ -338,7 +425,8 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
 
     if moves <= 0 and not level_won:
         level_lost = true
-        message = "Fin du niveau • score %d" % score
+        combo = 0
+        message = "Niveau échoué • touche pour réessayer"
 
     busy = false
     queue_redraw()
@@ -409,7 +497,19 @@ func _apply_snake_damage(match_count: int) -> void:
     combat_active = false
     rescue_open = true
     level_won = true
-    message = "SAUVETAGE RÉUSSI ! Le héros libère son allié."
+    var earned_stars := 1
+    if moves >= 12:
+        earned_stars = 3
+    elif moves >= 6:
+        earned_stars = 2
+    stars += earned_stars
+    coins += level_coins + earned_stars * 5
+    best_score = maxi(best_score, score)
+    unlocked_level = maxi(unlocked_level, mini(level_number + 1, 10))
+    if level_number >= 10:
+        campaign_complete = true
+    _save_progress()
+    message = "SAUVETAGE RÉUSSI ! +%d ★  +%d ◆" % [earned_stars, level_coins + earned_stars * 5]
     var rescue_tween := create_tween()
     rescue_tween.set_parallel(true)
     rescue_tween.tween_property(self, "hero_x", 560.0, 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
