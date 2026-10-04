@@ -5,17 +5,12 @@ extends Node2D
 # Matching tiles damages the next obstacle; destroying it moves the hero forward.
 
 const COLS := 7
-const ROWS := 8
-const CELL := 78.0
-const BOARD_X := 39.0
-const BOARD_Y := 515.0
-const COLORS := [
-    Color("5fcf62"),
-    Color("ef5350"),
-    Color("ffc94d"),
-    Color("5b9cf6"),
-    Color("b56cf2")
-]
+const ROWS := 6
+const CELL := 91.0
+const BOARD_X := 40.0
+const BOARD_Y := 690.0
+const COLORS := [Color("45c95a"), Color("ef4545"), Color("ffc43d"), Color("4d8ff2"), Color("a957e8")]
+const TILE_SYMBOLS := ["●", "■", "♛", "◆", "✦"]
 
 const PATH_POINTS := [
     Vector2(105, 390),
@@ -118,159 +113,128 @@ func _new_level() -> void:
     busy = false
 
 func _draw() -> void:
-    # Full portrait background.
-    draw_rect(Rect2(0, 0, 720, 1280), Color("efe7d6"))
-    draw_rect(Rect2(0, 0, 720, 150), Color("2467b8"))
-    draw_rect(Rect2(0, 150, 720, 12), Color("f5c84b"))
+    # Full-screen portrait adventure layout inspired by premium mobile puzzle games.
+    draw_rect(Rect2(0, 0, 720, 1280), Color("17120f"))
+    _draw_top_hud()
+    _draw_rescue_scene()
+    _draw_board()
 
-    # Header.
-    draw_string(ThemeDB.fallback_font, Vector2(36, 62), "PUZZLE HEROES",
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color.WHITE)
-    draw_string(ThemeDB.fallback_font, Vector2(38, 112), "LEVEL 1 • LE CHEMIN",
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 23, Color("dcecff"))
-    draw_string(ThemeDB.fallback_font, Vector2(515, 65), "★ %d" % score,
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color.WHITE)
-    draw_string(ThemeDB.fallback_font, Vector2(515, 110), "COUPS %d" % moves,
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 23, Color.WHITE)
+func _draw_top_hud() -> void:
+    draw_rect(Rect2(0, 0, 720, 92), Color("2a211b"))
+    draw_rect(Rect2(0, 88, 720, 7), Color("e9b62f"))
+    draw_string(ThemeDB.fallback_font, Vector2(30, 38), "PUZZLE HEROES", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("fff4d0"))
+    draw_string(ThemeDB.fallback_font, Vector2(30, 68), "NIVEAU 1", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("d7c29a"))
+    draw_circle(Vector2(552, 43), 18, Color("e9b62f"))
+    draw_string(ThemeDB.fallback_font, Vector2(544, 51), "★", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("5a3b10"))
+    draw_string(ThemeDB.fallback_font, Vector2(580, 51), str(score), HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color.WHITE)
+    draw_rect(Rect2(625, 23, 65, 42), Color("49372a"))
+    draw_string(ThemeDB.fallback_font, Vector2(637, 51), str(moves), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("fff1bd"))
 
-    _draw_adventure_area()
+func _draw_rescue_scene() -> void:
+    # Stone chamber.
+    draw_rect(Rect2(18, 108, 684, 548), Color("7d5a35"))
+    draw_rect(Rect2(28, 118, 664, 528), Color("34281e"))
+    # Wall bands and floor.
+    for y in range(125, 470, 52):
+        for x in range(34, 690, 82):
+            var off := 41 if ((y / 52) as int) % 2 == 1 else 0
+            draw_rect(Rect2(x + off, y, 74, 46), Color("4b3b2c"), true)
+            draw_rect(Rect2(x + off, y, 74, 46), Color("6d5238"), false, 2)
+    draw_rect(Rect2(28, 470, 664, 176), Color("8b6a42"))
+    for x in range(35, 690, 54):
+        draw_rect(Rect2(x, 480, 48, 72), Color("6b4e32"))
+        draw_rect(Rect2(x, 480, 48, 72), Color("b08a54"), false, 2)
+    # Golden pipe around the serpent.
+    draw_line(Vector2(80, 190), Vector2(80, 430), Color("c48b18"), 28)
+    draw_line(Vector2(80, 190), Vector2(590, 190), Color("d7a52b"), 28)
+    draw_line(Vector2(590, 190), Vector2(590, 390), Color("c48b18"), 28)
+    draw_line(Vector2(80, 190), Vector2(590, 190), Color("ffe17a"), 9)
+    draw_line(Vector2(80, 190), Vector2(80, 430), Color("ffe17a"), 8)
+    draw_line(Vector2(590, 190), Vector2(590, 390), Color("ffe17a"), 8)
 
-    # Match-3 board.
-    draw_rect(Rect2(25, 500, 670, 670), Color("d3a23b"))
-    draw_rect(Rect2(32, 507, 656, 656), Color("f7f0df"))
+    # Large original serpent.
+    var snake_center := Vector2(420, 285 + sin(hero_bounce * 0.7) * 3.0)
+    _draw_large_snake(snake_center)
 
+    # Rescue chamber and captive.
+    draw_rect(Rect2(438, 405, 205, 168), Color("241c16"))
+    draw_rect(Rect2(447, 414, 187, 150), Color("4b3828"))
+    draw_line(Vector2(447, 505), Vector2(634, 505), Color("d1a44a"), 8)
+    if level_won:
+        draw_circle(Vector2(548, 468), 46, Color("e4b73f"))
+        draw_circle(Vector2(548, 468), 38, Color("d8e5ff"))
+        draw_string(ThemeDB.fallback_font, Vector2(530, 478), "✓", HORIZONTAL_ALIGNMENT_LEFT, -1, 38, Color("3b7f43"))
+    else:
+        _draw_hero(Vector2(520, 490))
+
+    # Destructible stone wall.
+    if obstacle_index < obstacle_hp.size():
+        draw_rect(Rect2(45, 505, 245, 120), Color("756b61"))
+        for yy in range(512, 622, 25):
+            for xx in range(52, 285, 35):
+                var jitter := float((xx + yy) % 9)
+                draw_circle(Vector2(xx + jitter, yy), 13, Color("a8a09a"))
+                draw_circle(Vector2(xx + jitter - 3, yy - 3), 5, Color(1, 1, 1, 0.22))
+        draw_string(ThemeDB.fallback_font, Vector2(65, 535), "BLOQUÉ", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("fff1d0"))
+        for h in range(obstacle_hp[obstacle_index]):
+            draw_rect(Rect2(65 + h * 25, 548, 20, 8), Color("e94b42"))
+
+    # Objective badge.
+    draw_rect(Rect2(250, 120, 220, 42), Color(0.05, 0.04, 0.03, 0.86))
+    var objective := "COMBAT !" if combat_active else ("SAUVETAGE !" if level_won else "CASSE LE MUR")
+    draw_string(ThemeDB.fallback_font, Vector2(280, 148), objective, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("ffe6a1"))
+
+func _draw_large_snake(pos: Vector2) -> void:
+    var hit := snake_hit_flash
+    var body := Color("74b72d") if hit <= 0.0 else Color("d9df45")
+    draw_circle(pos + Vector2(-145, -4), 58, body)
+    draw_circle(pos + Vector2(-102, 5), 55, body)
+    draw_circle(pos + Vector2(-58, 15), 52, body)
+    draw_circle(pos + Vector2(-14, 27), 49, body)
+    draw_circle(pos + Vector2(32, 37), 46, body)
+    draw_circle(pos + Vector2(77, 48), 44, body)
+    draw_circle(pos + Vector2(120, 60), 42, body)
+    draw_circle(pos + Vector2(157, 62), 50, body)
+    for p in [pos + Vector2(-145,-4),pos + Vector2(-102,5),pos + Vector2(-58,15),pos + Vector2(-14,27),pos + Vector2(32,37),pos + Vector2(77,48),pos + Vector2(120,60)]:
+        draw_circle(p + Vector2(-12,-12), 14, Color(1,1,1,0.18))
+        draw_circle(p, 46, Color("3c7620"), false, 4)
+    var head := pos + Vector2(175, 62)
+    draw_circle(head, 58, body)
+    draw_circle(head + Vector2(17,-10), 8, Color("fff0b0"))
+    draw_circle(head + Vector2(19,-10), 3, Color("21180f"))
+    draw_line(head + Vector2(38,14), head + Vector2(57,18), Color("b62e2e"), 4)
+
+func _draw_board() -> void:
+    draw_rect(Rect2(24, 666, 672, 580), Color("b98628"))
+    draw_rect(Rect2(32, 674, 656, 564), Color("e8d4a7"))
+    draw_string(ThemeDB.fallback_font, Vector2(48, 698), "MATCH 3", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("68451d"))
     for y in ROWS:
         for x in COLS:
-            var rect := Rect2(
-                BOARD_X + x * CELL,
-                BOARD_Y + y * CELL,
-                CELL - 4,
-                CELL - 4
-            )
+            var rect := Rect2(BOARD_X + x * CELL, BOARD_Y + y * CELL, CELL - 5, CELL - 5)
             draw_style_box(_cell_box(), rect)
             var value: int = board[y][x]
             var center := rect.get_center()
-            draw_circle(center, 27, COLORS[value])
-            draw_circle(center + Vector2(-8, -9), 8, Color(1, 1, 1, 0.22))
-            draw_circle(center, 29, Color(0.15, 0.15, 0.15, 0.12), false, 3.0)
+            _draw_gem(center, value)
 
-    # Bottom status.
-    draw_rect(Rect2(32, 1190, 656, 62), Color("3b3026"))
-    draw_string(ThemeDB.fallback_font, Vector2(55, 1229), message,
-        HORIZONTAL_ALIGNMENT_LEFT, 610, 21, Color.WHITE)
+    draw_rect(Rect2(32, 1248, 656, 32), Color("241c17"))
+    draw_string(ThemeDB.fallback_font, Vector2(50, 1271), message, HORIZONTAL_ALIGNMENT_LEFT, 620, 16, Color.WHITE)
 
-func _draw_adventure_area() -> void:
-    # Professional original 2D scene artwork.
-    draw_rect(Rect2(32, 190, 656, 292), Color("4b382d"))
-    draw_texture_rect(SCENE_TEX, Rect2(42, 200, 636, 272), false)
-
-    # Adventure path is drawn over the scene to keep gameplay readable.
-    for i in range(PATH_POINTS.size() - 1):
-        draw_line(PATH_POINTS[i], PATH_POINTS[i + 1], Color("d6b77b"), 30.0)
-        draw_line(PATH_POINTS[i], PATH_POINTS[i + 1], Color("ead49b"), 22.0)
-
-    # Progress markers.
-    for i in PATH_POINTS.size():
-        var marker_color := Color("f8e7b0") if i <= hero_progress else Color("6e7547")
-        draw_circle(PATH_POINTS[i], 14, marker_color)
-        draw_circle(PATH_POINTS[i], 5, Color("6b5437"))
-
-    # Obstacles sit between path points.
-    for i in range(OBSTACLE_MAX_HP.size()):
-        var pos: Vector2 = (PATH_POINTS[i] + PATH_POINTS[i + 1]) * 0.5
-        _draw_obstacle(pos, i)
-
-    # Goal flag.
-    var goal := PATH_POINTS[-1] + Vector2(0, -55)
-    draw_line(goal, goal + Vector2(0, 58), Color("5a4632"), 5.0)
-    draw_colored_polygon(PackedVector2Array([
-        goal,
-        goal + Vector2(62, 14),
-        goal + Vector2(0, 31)
-    ]), Color("f04b45"))
-    draw_string(ThemeDB.fallback_font, goal + Vector2(-24, 85), "SORTIE",
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("fff4d0"))
-
-    # Snake enemy on the far side.
-    _draw_snake(Vector2(snake_x, 285 + sin(hero_bounce * 0.7) * 4.0))
-
-    # Captive appears at the exit and is rescued after the final obstacle.
-    if level_won or rescue_open:
-        draw_texture_rect(CAPTIVE_TEX, Rect2(Vector2(610, 325), Vector2(58, 79)), false)
-
-    _draw_effects()
-
-    # Hero follows the unlocked path.
-    var hero_offset := Vector2(0, sin(hero_bounce) * 3.0)
-    _draw_hero(Vector2(hero_x, hero_y) + hero_offset)
-
-    # Combat HUD.
-    if combat_active and not level_won:
-        draw_rect(Rect2(455, 266, 192, 45), Color(0.18, 0.08, 0.06, 0.88))
-        draw_string(ThemeDB.fallback_font, Vector2(470, 286), "SERPENT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe6c0"))
-        for h in range(snake_hp):
-            draw_rect(Rect2(470 + h * 27, 296, 21, 8), Color("e84d48"))
-
-    # Contextual objective.
-    if level_won:
-        draw_rect(Rect2(112, 208, 496, 56), Color(0.08, 0.28, 0.14, 0.92))
-        draw_string(ThemeDB.fallback_font, Vector2(151, 246),
-            "CHEMIN OUVERT ! NIVEAU RÉUSSI",
-            HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
-    elif combat_active:
-        draw_rect(Rect2(132, 208, 456, 56), Color(0.42, 0.16, 0.06, 0.94))
-        draw_string(ThemeDB.fallback_font, Vector2(177, 246),
-            "COMBAT ! ATTAQUE LE SERPENT",
-            HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
-    elif level_lost:
-        draw_rect(Rect2(125, 208, 470, 56), Color(0.35, 0.08, 0.07, 0.92))
-        draw_string(ThemeDB.fallback_font, Vector2(180, 246),
-            "LE HÉROS EST BLOQUÉ",
-            HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
-    else:
-        var hp := obstacle_hp[obstacle_index] if obstacle_index < obstacle_hp.size() else 0
-        draw_string(ThemeDB.fallback_font, Vector2(58, 223),
-            "OBSTACLE %d/%d • FORCE %d" % [obstacle_index + 1, obstacle_hp.size(), hp],
-            HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("30452b"))
-
-func _draw_obstacle(pos: Vector2, index: int) -> void:
-    if index >= obstacle_hp.size() or obstacle_hp[index] <= 0:
-        draw_circle(pos + Vector2(-12, 5), 9, Color("bca675"))
-        draw_circle(pos + Vector2(10, 7), 7, Color("a78e64"))
-        draw_line(pos + Vector2(-18, -2), pos + Vector2(18, 7), Color("d8c79e"), 3)
-        return
-
-    var hp: int = obstacle_hp[index]
-    var shake := sin(obstacle_flash * 28.0 + float(index)) * 5.0 if obstacle_flash > 0.0 else 0.0
-    var p := pos + Vector2(shake, 0)
-    draw_texture_rect(ROCK_TEX, Rect2(p - Vector2(43, 43), Vector2(86, 86)), false)
-    for h in range(hp):
-        draw_circle(p + Vector2((h - 1) * 16.0 - 8.0, -53), 6, Color("ef4f48"))
-
-func _draw_hero(pos: Vector2) -> void:
-    draw_texture_rect(HERO_TEX, Rect2(pos - Vector2(43, 58), Vector2(86, 108)), false)
-    if attack_flash > 0.0:
-        draw_line(pos + Vector2(25, -4), pos + Vector2(68, -24), Color(1, 0.88, 0.35, attack_flash), 8)
-        draw_line(pos + Vector2(33, 4), pos + Vector2(76, -14), Color(1, 1, 1, attack_flash * 0.8), 3)
-
-func _draw_snake(pos: Vector2) -> void:
-    var shake := sin(hero_bounce * 12.0) * snake_alert * 5.0
-    var flash_scale := 1.0 + snake_hit_flash * 0.12
-    draw_texture_rect(SNAKE_TEX, Rect2(pos + Vector2(-58 * flash_scale + shake, -42 * flash_scale), Vector2(116 * flash_scale, 82 * flash_scale)), false)
-
-func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
-    var points := PackedVector2Array()
-    for i in 32:
-        var a := TAU * float(i) / 32.0
-        points.append(center + Vector2(cos(a) * radius.x, sin(a) * radius.y))
-    draw_colored_polygon(points, color)
+func _draw_gem(center: Vector2, value: int) -> void:
+    var base := COLORS[value]
+    draw_circle(center + Vector2(2, 4), 31, Color(0,0,0,0.20))
+    draw_circle(center, 29, base)
+    draw_circle(center, 25, base.lightened(0.08))
+    draw_circle(center + Vector2(-9,-10), 8, Color(1,1,1,0.30))
+    draw_circle(center, 30, Color("4a392c"), false, 2)
+    draw_string(ThemeDB.fallback_font, center + Vector2(-12, 10), TILE_SYMBOLS[value],
+        HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color(1,1,1,0.82))
 
 func _cell_box() -> StyleBoxFlat:
     var box := StyleBoxFlat.new()
-    box.bg_color = Color("fffaf0")
-    box.border_color = Color("d9c9a8")
+    box.bg_color = Color("f8f0dd")
+    box.border_color = Color("c9af7b")
     box.set_border_width_all(2)
-    box.set_corner_radius_all(8)
+    box.set_corner_radius_all(9)
     return box
 
 func _input(event: InputEvent) -> void:
