@@ -186,15 +186,27 @@ var boss_ai_timer := 0.0
 var boss_ai_pattern := 0
 var combat_boss_kind := ""
 
+# Premium Content 11: procedural audio system (SFX + adaptive music).
+var sfx_players: Array[AudioStreamPlayer] = []
+var music_player: AudioStreamPlayer
+var music_playback: AudioStreamGeneratorPlayback
+var audio_ready := false
+var audio_time := 0.0
+var music_bar := 0
+var sfx_cursor := 0
+
 func _ready() -> void:
     randomize()
     _setup_combat_nodes()
+    _setup_audio_system()
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
     queue_redraw()
 
 func _process(delta: float) -> void:
+    audio_time += delta
+    _update_music_audio()
     hero_bounce += delta * 5.0
     art_idle_phase += delta * 4.0
     art_attack_phase = maxf(0.0, art_attack_phase - delta * 3.8)
@@ -245,6 +257,115 @@ func _process(delta: float) -> void:
     _update_tile_trails(delta)
     _update_effects(delta)
     queue_redraw()
+
+func _setup_audio_system() -> void:
+    if audio_ready:
+        return
+    for i in range(6):
+        var p := AudioStreamPlayer.new()
+        p.name = "SFX_%d" % i
+        p.volume_db = -5.0
+        add_child(p)
+        sfx_players.append(p)
+    music_player = AudioStreamPlayer.new()
+    music_player.name = "AdaptiveMusic"
+    music_player.volume_db = -18.0
+    add_child(music_player)
+    var stream := AudioStreamGenerator.new()
+    stream.mix_rate = 44100.0
+    stream.buffer_length = 0.45
+    music_player.stream = stream
+    music_player.play()
+    music_playback = music_player.get_stream_playback() as AudioStreamGeneratorPlayback
+    audio_ready = music_playback != null
+
+func _make_tone_stream(frequency: float, duration: float, volume: float = 0.22, noise: float = 0.0) -> AudioStreamGenerator:
+    var stream := AudioStreamGenerator.new()
+    stream.mix_rate = 44100.0
+    stream.buffer_length = maxf(0.08, duration + 0.03)
+    return stream
+
+func _play_sfx(kind: String, intensity: float = 1.0) -> void:
+    if not audio_ready or sfx_players.is_empty():
+        return
+    var player := sfx_players[sfx_cursor]
+    sfx_cursor = (sfx_cursor + 1) % sfx_players.size()
+    var stream := _make_tone_stream(440.0, 0.12)
+    player.stream = stream
+    player.volume_db = -5.0 if kind != "boss" else -3.0
+    player.play()
+    var pb := player.get_stream_playback() as AudioStreamGeneratorPlayback
+    if pb == null:
+        return
+    var sr := 44100.0
+    var duration := 0.12
+    var base := 440.0
+    match kind:
+        "swap":
+            base = 330.0
+            duration = 0.07
+        "match":
+            base = 520.0 + 55.0 * clampf(intensity, 0.0, 5.0)
+            duration = 0.10
+        "combo":
+            base = 660.0 + 90.0 * clampf(intensity, 0.0, 5.0)
+            duration = 0.16
+        "booster":
+            base = 740.0
+            duration = 0.20
+        "boss":
+            base = 150.0
+            duration = 0.28
+        "hit":
+            base = 210.0
+            duration = 0.12
+        "win":
+            base = 660.0
+            duration = 0.45
+        "lose":
+            base = 180.0
+            duration = 0.40
+        "rescue":
+            base = 880.0
+            duration = 0.35
+    var frames := int(sr * duration)
+    for i in range(mini(frames, pb.get_frames_available())):
+        var t := float(i) / sr
+        var env := minf(1.0, t * 55.0) * maxf(0.0, 1.0 - t / duration)
+        var freq := base * (1.0 + 0.035 * sin(t * 31.0))
+        if kind == "win":
+            freq = base * (1.0 + 0.5 * sin(t * TAU * 2.0))
+        elif kind == "combo":
+            freq = base * (1.0 + 0.12 * sin(t * 18.0))
+        var sample := sin(TAU * freq * t) * env * 0.24
+        sample += sin(TAU * freq * 2.01 * t) * env * 0.08
+        if noise > 0.0:
+            sample += randf_range(-noise, noise) * env
+        pb.push_frame(Vector2(sample, sample))
+
+func _update_music_audio() -> void:
+    if not audio_ready or music_playback == null:
+        return
+    var available := music_playback.get_frames_available()
+    if available <= 0:
+        return
+    var sr := 44100.0
+    var tempo := 104.0 if not combat_active else 124.0
+    var beat := 60.0 / tempo
+    var notes := [261.63, 329.63, 392.0, 523.25, 392.0, 329.63, 293.66, 440.0]
+    for i in range(available):
+        var t := audio_time - float(available - i) / sr
+        var step := int(floor(t / (beat * 0.5))) % notes.size()
+        var local := fmod(t, beat * 0.5)
+        var freq := notes[step]
+        if combat_active:
+            freq *= 0.5
+        var env := 0.035 * maxf(0.0, 1.0 - local / (beat * 0.5))
+        var sample := sin(TAU * freq * t) * env
+        sample += sin(TAU * freq * 2.0 * t) * env * 0.22
+        if fever > 0.0:
+            sample += sin(TAU * freq * 4.0 * t) * 0.018
+        music_playback.push_frame(Vector2(sample, sample))
 
 func _setup_combat_nodes() -> void:
     combat_layer = Node2D.new()
@@ -1440,6 +1561,7 @@ func _inside(cell: Vector2i) -> bool:
     return cell.x >= 0 and cell.x < COLS and cell.y >= 0 and cell.y < ROWS
 
 func _try_swap(a: Vector2i, b: Vector2i) -> void:
+    _play_sfx("swap")
     busy = true
     _swap(a, b)
     await _play_swap_animation(a, b, false)
@@ -1454,6 +1576,7 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
         combo = 0
         cascade = 0
         message = "Pas de combinaison : essaie un autre mouvement."
+        _play_sfx("hit", 0.6)
         busy = false
         queue_redraw()
         return
@@ -1492,6 +1615,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         cascade += 1
         combo += 1
         combo_flash = 1.0
+        _play_sfx("combo" if combo >= 2 else "match", combo)
         last_match_count = matches.size()
         var multiplier := 1 + mini(combo - 1, 4)
         if fever > 0.0:
@@ -1520,6 +1644,8 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             special_value = SPECIAL_COLOR
         elif matches.size() == 4:
             special_value = SPECIAL_H if not _vertical_match_at(matches, special_cell) else SPECIAL_V
+        if special_value >= 0:
+            _play_sfx("booster", 1.0)
         if special_value >= 0 and goal_kind == "special":
             goal_progress = mini(goal_target, goal_progress + 1)
             _update_daily_quest("special", 1)
