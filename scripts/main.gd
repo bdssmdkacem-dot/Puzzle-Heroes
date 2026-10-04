@@ -78,6 +78,8 @@ var swap_anim_t := 1.0
 var swap_rejected := false
 var collapse_animating := false
 var booster_paths: Array = []
+var vfx_rings: Array = []
+var tile_trails: Array = []
 var goal_kind := "rocks"
 var goal_target := 4
 var goal_progress := 0
@@ -111,6 +113,8 @@ func _process(delta: float) -> void:
     combo_flash = maxf(0.0, combo_flash - delta * 2.8)
     _update_tile_animations(delta)
     _update_booster_paths(delta)
+    _update_vfx_rings(delta)
+    _update_tile_trails(delta)
     _update_effects(delta)
     queue_redraw()
 
@@ -167,6 +171,8 @@ func _new_level() -> void:
     swap_animating = false
     collapse_animating = false
     booster_paths.clear()
+    vfx_rings.clear()
+    tile_trails.clear()
 
     _configure_level_goal()
     message = _level_objective()
@@ -180,6 +186,8 @@ func _draw() -> void:
     _draw_top_hud()
     _draw_rescue_scene()
     _draw_board()
+    _draw_tile_trails()
+    _draw_vfx_rings()
     _draw_effects()
     _draw_rescue_badge()
     if level_won or level_lost:
@@ -531,6 +539,7 @@ func _play_swap_animation(a: Vector2i, b: Vector2i, rejected: bool) -> void:
     swap_rejected = rejected
     swap_animating = true
     swap_anim_t = 1.0 if rejected else 0.0
+    _spawn_tile_trail(a, b)
     var tween := create_tween()
     if rejected:
         tween.tween_property(self, "swap_anim_t", 0.0, 0.13).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -668,8 +677,8 @@ func _apply_snake_damage(match_count: int) -> void:
 func _spawn_match_bursts(matches: Array[Vector2i]) -> void:
     for cell in matches:
         var p := Vector2(BOARD_X + cell.x * CELL + (CELL - 5) * 0.5, BOARD_Y + cell.y * CELL + (CELL - 5) * 0.5)
-        for i in range(8):
-            var angle := TAU * float(i) / 8.0
+        _spawn_vfx_ring(p, 16.0, 72.0, Color(1.0, 0.78, 0.22, 0.9), 0.30)
+        for i in range(10):            var angle := TAU * float(i) / 8.0
             effects.append({
                 "p": p,
                 "v": Vector2(cos(angle), sin(angle)) * (75.0 + randi() % 80),
@@ -678,6 +687,46 @@ func _spawn_match_bursts(matches: Array[Vector2i]) -> void:
                 "target": p,
                 "kind": 1
             })
+
+func _cell_center(cell: Vector2i) -> Vector2:
+    return Vector2(BOARD_X + cell.x * CELL + (CELL - 5) * 0.5, BOARD_Y + cell.y * CELL + (CELL - 5) * 0.5)
+
+func _spawn_vfx_ring(p: Vector2, start_radius: float, end_radius: float, color: Color, life: float) -> void:
+    vfx_rings.append({"p": p, "r0": start_radius, "r1": end_radius, "t": 0.0, "life": life, "color": color})
+
+func _spawn_tile_trail(a: Vector2i, b: Vector2i) -> void:
+    tile_trails.append({"from": _cell_center(a), "to": _cell_center(b), "t": 0.0, "life": 0.20})
+
+func _update_vfx_rings(delta: float) -> void:
+    for i in range(vfx_rings.size() - 1, -1, -1):
+        var ring: Dictionary = vfx_rings[i]
+        ring["t"] = float(ring["t"]) + delta
+        vfx_rings[i] = ring
+        if float(ring["t"]) >= float(ring["life"]):
+            vfx_rings.remove_at(i)
+
+func _update_tile_trails(delta: float) -> void:
+    for i in range(tile_trails.size() - 1, -1, -1):
+        var trail: Dictionary = tile_trails[i]
+        trail["t"] = float(trail["t"]) + delta
+        tile_trails[i] = trail
+        if float(trail["t"]) >= float(trail["life"]):
+            tile_trails.remove_at(i)
+
+func _draw_vfx_rings() -> void:
+    for ring in vfx_rings:
+        var life := clampf(1.0 - float(ring["t"]) / float(ring["life"]), 0.0, 1.0)
+        var t := 1.0 - life
+        var radius := lerpf(float(ring["r0"]), float(ring["r1"]), t)
+        var c: Color = ring["color"]
+        c.a *= life
+        draw_arc(Vector2(ring["p"]), radius, 0.0, TAU, 32, c, 5.0)
+
+func _draw_tile_trails() -> void:
+    for trail in tile_trails:
+        var life := clampf(1.0 - float(trail["t"]) / float(trail["life"]), 0.0, 1.0)
+        draw_line(Vector2(trail["from"]), Vector2(trail["to"]), Color(1, 1, 1, life * 0.18), 20.0)
+        draw_line(Vector2(trail["from"]), Vector2(trail["to"]), Color(1, 0.88, 0.4, life * 0.45), 7.0)
 
 func _spawn_attack_effects(match_count: int) -> void:
     var origin := Vector2(hero_x + 28, hero_y - 8)
@@ -887,6 +936,7 @@ func _prime_match_animation(matches: Array[Vector2i]) -> void:
     for cell in matches:
         if _inside(cell):
             tile_scale[cell.y][cell.x] = 1.12
+            _spawn_vfx_ring(_cell_center(cell), 18.0, 62.0, Color(1.0, 0.88, 0.34, 0.9), 0.20)
 
 func _update_tile_animations(delta: float) -> void:
     var done := true
@@ -911,6 +961,15 @@ func _draw_booster_path(path: Dictionary) -> void:
     var to: Vector2 = path["to"]
     var life := clampf(1.0 - float(path["t"]) / float(path["life"]), 0.0, 1.0)
     var p := from.lerp(to, clampf(float(path["t"]) / float(path["life"]), 0.0, 1.0))
-    draw_line(from, p, Color(1.0, 0.88, 0.3, life * 0.55), 12.0)
-    draw_line(from, p, Color(1.0, 1.0, 0.78, life), 4.0)
-    draw_circle(p, 10.0 + 6.0 * life, Color(1.0, 0.82, 0.2, life * 0.9))
+    var kind := str(path.get("kind", "horizontal"))
+    var glow := Color(1.0, 0.82, 0.25, life * 0.55)
+    var core := Color(1.0, 1.0, 0.9, life)
+    if kind == "vertical":
+        glow = Color(0.35, 0.78, 1.0, life * 0.58)
+        core = Color(0.86, 0.96, 1.0, life)
+    elif kind == "bomb":
+        glow = Color(1.0, 0.32, 0.14, life * 0.62)
+        core = Color(1.0, 0.9, 0.68, life)
+    draw_line(from, p, glow, 15.0)
+    draw_line(from, p, core, 4.0)
+    draw_circle(p, 9.0 + 8.0 * life, core)
