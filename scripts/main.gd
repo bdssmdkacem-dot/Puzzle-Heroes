@@ -52,6 +52,8 @@ var combat_active := false
 var snake_hp := 5
 var snake_hit_flash := 0.0
 var effects: Array = []
+var refill_anim := 1.0
+var hero_attack := 0.0
 
 const HERO_TEX := preload("res://assets/art/hero.svg")
 const SNAKE_TEX := preload("res://assets/art/snake.svg")
@@ -71,6 +73,8 @@ func _process(delta: float) -> void:
     obstacle_flash = maxf(0.0, obstacle_flash - delta * 3.5)
     attack_flash = maxf(0.0, attack_flash - delta * 4.0)
     snake_hit_flash = maxf(0.0, snake_hit_flash - delta * 5.0)
+    refill_anim = minf(1.0, refill_anim + delta * 3.8)
+    hero_attack = maxf(0.0, hero_attack - delta * 3.8)
     _update_effects(delta)
     queue_redraw()
 
@@ -107,6 +111,8 @@ func _new_level() -> void:
     snake_hp = 5
     snake_hit_flash = 0.0
     effects.clear()
+    refill_anim = 1.0
+    hero_attack = 0.0
 
     message = "Aligne 3 tuiles pour casser le rocher !"
     level_won = false
@@ -119,6 +125,8 @@ func _draw() -> void:
     _draw_top_hud()
     _draw_rescue_scene()
     _draw_board()
+    _draw_effects()
+    _draw_rescue_badge()
 
 func _draw_top_hud() -> void:
     draw_rect(Rect2(0, 0, 720, 92), Color("2a211b"))
@@ -161,9 +169,7 @@ func _draw_rescue_scene() -> void:
     draw_rect(Rect2(447, 414, 187, 150), Color("4b3828"))
     draw_line(Vector2(447, 505), Vector2(634, 505), Color("d1a44a"), 8)
     if level_won:
-        draw_circle(Vector2(548, 468), 46, Color("e4b73f"))
-        draw_circle(Vector2(548, 468), 38, Color("d8e5ff"))
-        draw_string(ThemeDB.fallback_font, Vector2(530, 478), "✓", HORIZONTAL_ALIGNMENT_LEFT, -1, 38, Color("3b7f43"))
+        draw_texture_rect(CAPTIVE_TEX, Rect2(492, 425, 112, 142), false)
     else:
         _draw_hero(Vector2(520, 490))
 
@@ -184,6 +190,15 @@ func _draw_rescue_scene() -> void:
     var objective := "COMBAT !" if combat_active else ("SAUVETAGE !" if level_won else "CASSE LE MUR")
     draw_string(ThemeDB.fallback_font, Vector2(280, 148), objective, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("ffe6a1"))
 
+func _draw_hero(pos: Vector2) -> void:
+    var bob := sin(hero_bounce) * 3.0
+    var recoil := hero_attack * -18.0
+    var size := Vector2(126, 160)
+    var p := pos + Vector2(recoil, bob)
+    draw_texture_rect(HERO_TEX, Rect2(p - size * 0.5, size), false)
+    if hero_attack > 0.0:
+        draw_line(p + Vector2(48, -12), p + Vector2(90, -12), Color(1.0, 0.84, 0.25, hero_attack), 7)
+
 func _draw_large_snake(pos: Vector2) -> void:
     var scale := 0.72 + snake_hit_flash * 0.04
     var size := Vector2(600, 300) * scale
@@ -201,6 +216,8 @@ func _draw_board() -> void:
             draw_style_box(_cell_box(), rect)
             var value: int = board[y][x]
             var center := rect.get_center()
+            if refill_anim < 1.0:
+                center.y -= (1.0 - refill_anim) * float((ROWS - y) * 46)
             _draw_gem(center, value)
 
     draw_rect(Rect2(32, 1248, 656, 32), Color("241c17"))
@@ -307,8 +324,11 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     busy = true
     message = "+%d points • attaque l'obstacle !" % points
 
+    _spawn_match_bursts(matches)
     _clear_matches(matches)
     _collapse()
+    refill_anim = 0.0
+    hero_attack = 1.0
 
     _spawn_attack_effects(matches.size())
     if combat_active:
@@ -395,6 +415,20 @@ func _apply_snake_damage(match_count: int) -> void:
     rescue_tween.tween_property(self, "hero_x", 560.0, 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
     rescue_tween.tween_property(self, "hero_y", 375.0, 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
+func _spawn_match_bursts(matches: Array[Vector2i]) -> void:
+    for cell in matches:
+        var p := Vector2(BOARD_X + cell.x * CELL + (CELL - 5) * 0.5, BOARD_Y + cell.y * CELL + (CELL - 5) * 0.5)
+        for i in range(8):
+            var angle := TAU * float(i) / 8.0
+            effects.append({
+                "p": p,
+                "v": Vector2(cos(angle), sin(angle)) * (75.0 + randi() % 80),
+                "t": 0.0,
+                "life": 0.42 + float(randi() % 20) / 100.0,
+                "target": p,
+                "kind": 1
+            })
+
 func _spawn_attack_effects(match_count: int) -> void:
     var origin := Vector2(hero_x + 28, hero_y - 8)
     var target: Vector2 = (PATH_POINTS[obstacle_index] + PATH_POINTS[obstacle_index + 1]) * 0.5 if obstacle_index < PATH_POINTS.size() - 1 else origin
@@ -405,7 +439,8 @@ func _spawn_attack_effects(match_count: int) -> void:
             "v": Vector2(cos(angle), sin(angle)) * (90.0 + randi() % 100),
             "t": 0.0,
             "life": 0.45 + float(randi() % 30) / 100.0,
-            "target": target
+            "target": target,
+            "kind": 0
         })
 
 func _update_effects(delta: float) -> void:
@@ -422,8 +457,14 @@ func _draw_effects() -> void:
     for e in effects:
         var life := maxf(0.0, 1.0 - float(e["t"]) / float(e["life"]))
         var p := Vector2(e["p"])
-        draw_circle(p, 5.0 + 6.0 * life, Color(1.0, 0.78, 0.2, life))
-        draw_circle(p, 2.5, Color(1, 1, 1, life))
+        var kind := int(e.get("kind", 0))
+        if kind == 1:
+            draw_circle(p, 7.0 + 9.0 * life, Color(1.0, 0.82, 0.22, life))
+            draw_circle(p, 3.0, Color(1, 1, 1, life))
+            draw_line(p, p - Vector2(e["v"]) * 0.08, Color(1.0, 0.55, 0.12, life), 3.0)
+        else:
+            draw_circle(p, 5.0 + 6.0 * life, Color(1.0, 0.78, 0.2, life))
+            draw_circle(p, 2.5, Color(1, 1, 1, life))
 
 func _draw_rescue_badge() -> void:
     if not rescue_open:
