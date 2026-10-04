@@ -36,6 +36,7 @@ var campaign_complete := false
 var dragging := false
 var drag_start := Vector2.ZERO
 var drag_cell := Vector2i(-1, -1)
+var drag_visual_pos := Vector2.ZERO
 var active_touch_index := -1
 var busy := false
 
@@ -364,6 +365,14 @@ func _draw_board() -> void:
         _draw_gem_animated(pa + Vector2(0, bounce), va, 1.04, 1.0)
         _draw_gem_animated(pb - Vector2(0, bounce), vb, 1.04, 1.0)
 
+    if dragging and _inside(drag_cell):
+        var drag_value: int = board[drag_cell.y][drag_cell.x]
+        if drag_value >= 0:
+            var cell_center := Vector2(BOARD_X + drag_cell.x * CELL + (CELL - 5) * 0.5, BOARD_Y + drag_cell.y * CELL + (CELL - 5) * 0.5)
+            var delta := drag_visual_pos - drag_start
+            var limited := delta.limit_length(CELL * 0.78)
+            _draw_gem_animated(cell_center + limited, drag_value, 1.08, 1.0)
+
     for path in booster_paths:
         _draw_booster_path(path)
 
@@ -422,6 +431,7 @@ func _input(event: InputEvent) -> void:
             active_touch_index = event.index
             drag_start = _input_to_design(event.position)
             drag_cell = _screen_to_cell(drag_start)
+            drag_visual_pos = drag_start
             dragging = drag_cell.x >= 0
         elif not event.pressed and event.index == active_touch_index:
             if dragging:
@@ -431,6 +441,7 @@ func _input(event: InputEvent) -> void:
 
     elif event is InputEventScreenDrag and dragging and event.index == active_touch_index:
         var current_pos: Vector2 = _input_to_design(event.position)
+        drag_visual_pos = current_pos
         var delta: Vector2 = current_pos - drag_start
         if delta.length() >= 28.0:
             _finish_drag(current_pos)
@@ -439,12 +450,14 @@ func _input(event: InputEvent) -> void:
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
         if event.pressed:
             drag_start = event.position
+            drag_visual_pos = event.position
             drag_cell = _screen_to_cell(event.position)
             dragging = drag_cell.x >= 0
         elif dragging:
             _finish_drag(event.position)
 
     elif event is InputEventMouseMotion and dragging:
+        drag_visual_pos = event.position
         var mouse_delta: Vector2 = event.position - drag_start
         if mouse_delta.length() >= 34.0:
             _finish_drag(event.position)
@@ -517,13 +530,15 @@ func _play_swap_animation(a: Vector2i, b: Vector2i, rejected: bool) -> void:
     swap_b = b
     swap_rejected = rejected
     swap_animating = true
-    swap_anim_t = 0.0
+    swap_anim_t = 1.0 if rejected else 0.0
     var tween := create_tween()
-    tween.tween_property(self, "swap_anim_t", 1.0, 0.14 if not rejected else 0.11).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    if rejected:
+        tween.tween_property(self, "swap_anim_t", 0.0, 0.13).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+    else:
+        tween.tween_property(self, "swap_anim_t", 1.0, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
     await tween.finished
     if not rejected:
         swap_animating = false
-
 
 func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
     var matches := initial_matches
