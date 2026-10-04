@@ -1635,6 +1635,7 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     await _resolve_cascade(matches)
     if moves <= 0 and not level_won:
         level_lost = true
+        _play_sfx("lose")
         message = "Niveau échoué • touche pour réessayer"
     busy = false
     queue_redraw()
@@ -2262,6 +2263,7 @@ func _complete_level() -> void:
         return
     level_won = true
     combat_active = false
+    _play_sfx("win", 1.2)
     rescue_open = true
     var earned_stars := 1
     if moves >= 12:
