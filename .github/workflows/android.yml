@@ -73,7 +73,22 @@ jobs:
           echo "Godot Android SDK settings:"
           cat "$HOME/.config/godot/editor_settings-4.3.tres"
 
+      - name: Create CI debug keystore
+        run: |
+          mkdir -p build
+          keytool -genkeypair -v \
+            -keystore build/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Export Android APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}}/build/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           mkdir -p build
           ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug Android build/puzzle_heroes.apk --verbose
