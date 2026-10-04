@@ -18,6 +18,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          yes | sdkmanager --licenses >/dev/null || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          adb version
+          java -version
+
       - name: Download Godot 4.3
         run: |
           curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
@@ -33,14 +44,14 @@ jobs:
           cp templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.3.stable/android_release.apk"
           echo "4.3.stable" > "$HOME/.local/share/godot/export_templates/4.3.stable/version.txt"
 
-      - name: Validate project
+      - name: Validate Godot project
         run: |
-          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit
+          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit --verbose
 
       - name: Export Android APK
         run: |
           mkdir -p build
-          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug Android build/puzzle_heroes.apk
+          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug Android build/puzzle_heroes.apk --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
