@@ -1,0 +1,48 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download Godot 4.3
+        run: |
+          curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+          unzip -q godot.zip -d godot-bin
+          chmod +x godot-bin/Godot_v4.3-stable_linux.x86_64
+
+      - name: Download Android export templates
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          curl -L -o templates.tpz https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz
+          unzip -q templates.tpz -d templates
+          cp templates/templates/android_debug.apk "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
+          cp templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.3.stable/android_release.apk"
+
+      - name: Validate project
+        run: |
+          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit
+
+      - name: Export Android APK
+        run: |
+          mkdir -p build
+          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug Android build/puzzle_heroes.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-heroes-android
+          path: build/puzzle_heroes.apk
