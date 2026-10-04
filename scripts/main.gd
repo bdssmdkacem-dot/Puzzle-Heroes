@@ -52,6 +52,9 @@ var obstacle_flash := 0.0
 var last_match_count := 0
 var attack_flash := 0.0
 var rescue_open := false
+var combat_active := false
+var snake_hp := 5
+var snake_hit_flash := 0.0
 var effects: Array = []
 
 const HERO_TEX := preload("res://assets/art/hero.svg")
@@ -70,6 +73,7 @@ func _process(delta: float) -> void:
     snake_alert = maxf(0.0, snake_alert - delta * 2.5)
     obstacle_flash = maxf(0.0, obstacle_flash - delta * 3.5)
     attack_flash = maxf(0.0, attack_flash - delta * 4.0)
+    snake_hit_flash = maxf(0.0, snake_hit_flash - delta * 5.0)
     _update_effects(delta)
     queue_redraw()
 
@@ -102,6 +106,9 @@ func _new_level() -> void:
     last_match_count = 0
     attack_flash = 0.0
     rescue_open = false
+    combat_active = false
+    snake_hp = 5
+    snake_hit_flash = 0.0
     effects.clear()
 
     message = "Aligne 3 tuiles pour casser le rocher !"
@@ -196,11 +203,23 @@ func _draw_adventure_area() -> void:
     var hero_offset := Vector2(0, sin(hero_bounce) * 3.0)
     _draw_hero(Vector2(hero_x, hero_y) + hero_offset)
 
+    # Combat HUD.
+    if combat_active and not level_won:
+        draw_rect(Rect2(455, 266, 192, 45), Color(0.18, 0.08, 0.06, 0.88))
+        draw_string(ThemeDB.fallback_font, Vector2(470, 286), "SERPENT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe6c0"))
+        for h in snake_hp:
+            draw_rect(Rect2(470 + h * 27, 296, 21, 8), Color("e84d48"))
+
     # Contextual objective.
     if level_won:
         draw_rect(Rect2(112, 208, 496, 56), Color(0.08, 0.28, 0.14, 0.92))
         draw_string(ThemeDB.fallback_font, Vector2(151, 246),
             "CHEMIN OUVERT ! NIVEAU RÉUSSI",
+            HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
+    elif combat_active:
+        draw_rect(Rect2(132, 208, 456, 56), Color(0.42, 0.16, 0.06, 0.94))
+        draw_string(ThemeDB.fallback_font, Vector2(177, 246),
+            "COMBAT ! ATTAQUE LE SERPENT",
             HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
     elif level_lost:
         draw_rect(Rect2(125, 208, 470, 56), Color(0.35, 0.08, 0.07, 0.92))
@@ -236,7 +255,8 @@ func _draw_hero(pos: Vector2) -> void:
 
 func _draw_snake(pos: Vector2) -> void:
     var shake := sin(hero_bounce * 12.0) * snake_alert * 5.0
-    draw_texture_rect(SNAKE_TEX, Rect2(pos + Vector2(-58 + shake, -42), Vector2(116, 82)), false)
+    var flash_scale := 1.0 + snake_hit_flash * 0.12
+    draw_texture_rect(SNAKE_TEX, Rect2(pos + Vector2(-58 * flash_scale + shake, -42 * flash_scale), Vector2(116 * flash_scale, 82 * flash_scale)), false)
 
 func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
     var points := PackedVector2Array()
@@ -335,7 +355,10 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     _collapse()
 
     _spawn_attack_effects(matches.size())
-    _apply_adventure_damage(matches.size())
+    if combat_active:
+        _apply_snake_damage(matches.size())
+    else:
+        _apply_adventure_damage(matches.size())
 
     if moves <= 0 and not level_won:
         level_lost = true
@@ -373,13 +396,12 @@ func _apply_adventure_damage(match_count: int) -> void:
     hero_progress += 1
 
     if hero_progress >= PATH_POINTS.size() - 1:
-        level_won = true
-        rescue_open = true
-        message = "SAUVETAGE RÉUSSI ! Le héros libère son allié."
-        var win_tween := create_tween()
-        win_tween.set_parallel(true)
-        win_tween.tween_property(self, "hero_x", PATH_POINTS[-1].x, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-        win_tween.tween_property(self, "hero_y", PATH_POINTS[-1].y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+        combat_active = true
+        message = "LE SERPENT BLOQUE LA SORTIE ! Attaque-le."
+        var combat_tween := create_tween()
+        combat_tween.set_parallel(true)
+        combat_tween.tween_property(self, "hero_x", PATH_POINTS[-1].x - 48.0, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+        combat_tween.tween_property(self, "hero_y", PATH_POINTS[-1].y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
         return
 
     var target := PATH_POINTS[hero_progress]
@@ -389,6 +411,33 @@ func _apply_adventure_damage(match_count: int) -> void:
     hero_tween.tween_property(self, "hero_y", target.y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
     message = "ROCHER DÉTRUIT ! Le héros avance."
+
+func _apply_snake_damage(match_count: int) -> void:
+    if not combat_active or level_won:
+        return
+    var damage := 1
+    if match_count >= 5:
+        damage = 2
+    if match_count >= 7:
+        damage = 3
+    snake_hp = max(0, snake_hp - damage)
+    snake_hit_flash = 1.0
+    snake_alert = 1.0
+    score += damage * 25
+    _spawn_attack_effects(match_count)
+
+    if snake_hp > 0:
+        message = "TOUCHE ! Le serpent perd %d PV." % damage
+        return
+
+    combat_active = false
+    rescue_open = true
+    level_won = true
+    message = "SAUVETAGE RÉUSSI ! Le héros libère son allié."
+    var rescue_tween := create_tween()
+    rescue_tween.set_parallel(true)
+    rescue_tween.tween_property(self, "hero_x", 560.0, 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+    rescue_tween.tween_property(self, "hero_y", 375.0, 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _spawn_attack_effects(match_count: int) -> void:
     var origin := Vector2(hero_x + 28, hero_y - 8)
