@@ -175,9 +175,19 @@ var snake_poison_sequence := 0.0
 var dragon_breath_sequence := 0.0
 var dragon_breath_variant := 0
 var boss_damage_window := false
+# Premium Content 10: real sprite/particle combat layer.
+var hero_sprite: AnimatedSprite2D
+var boss_sprite: AnimatedSprite2D
+var combat_particles: GPUParticles2D
+var boss_particles: GPUParticles2D
+var combat_layer: Node2D
+var sprite_anim_state := "idle"
+var boss_ai_timer := 0.0
+var boss_ai_pattern := 0
 
 func _ready() -> void:
     randomize()
+    _setup_combat_nodes()
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
@@ -193,6 +203,7 @@ func _process(delta: float) -> void:
     transition_phase += delta * 6.0
     juice_pulse = maxf(0.0, juice_pulse - delta * 4.0)
     _update_boss_combat(delta)
+    _update_combat_sprite_layer(delta)
     _update_impact_bursts(delta)
     _update_slash_effects(delta)
     _update_boss_projectiles(delta)
@@ -233,6 +244,126 @@ func _process(delta: float) -> void:
     _update_tile_trails(delta)
     _update_effects(delta)
     queue_redraw()
+
+func _setup_combat_nodes() -> void:
+    combat_layer = Node2D.new()
+    combat_layer.name = "CombatAnimationLayer"
+    add_child(combat_layer)
+
+    hero_sprite = AnimatedSprite2D.new()
+    hero_sprite.name = "HeroCombatSprite"
+    hero_sprite.sprite_frames = _make_sprite_frames(HERO_PRO_TEX)
+    hero_sprite.animation = &"idle"
+    hero_sprite.centered = true
+    hero_sprite.position = Vector2(hero_x, hero_y)
+    hero_sprite.scale = Vector2(0.72, 0.72)
+    combat_layer.add_child(hero_sprite)
+
+    boss_sprite = AnimatedSprite2D.new()
+    boss_sprite.name = "BossCombatSprite"
+    boss_sprite.sprite_frames = _make_sprite_frames(SNAKE_PRO_TEX)
+    boss_sprite.animation = &"idle"
+    boss_sprite.centered = true
+    boss_sprite.position = Vector2(575, 330)
+    boss_sprite.scale = Vector2(0.82, 0.82)
+    combat_layer.add_child(boss_sprite)
+
+    combat_particles = _make_particles("HeroCombatParticles", Color("ffe17a"))
+    combat_layer.add_child(combat_particles)
+    boss_particles = _make_particles("BossCombatParticles", Color("ff704f"))
+    combat_layer.add_child(boss_particles)
+
+func _make_sprite_frames(texture: Texture2D) -> SpriteFrames:
+    var frames := SpriteFrames.new()
+    frames.remove_animation(&"default")
+    for anim in [&"idle", &"attack", &"hit", &"defeat"]:
+        frames.add_animation(anim)
+        frames.set_animation_speed(anim, 8.0 if anim == &"idle" else 12.0)
+        frames.set_animation_loop(anim, anim == &"idle")
+        for i in range(4 if anim == &"idle" else 3):
+            var frame := AtlasTexture.new()
+            frame.atlas = texture
+            frames.add_frame(anim, frame)
+    return frames
+
+func _make_particles(node_name: String, tint: Color) -> GPUParticles2D:
+    var p := GPUParticles2D.new()
+    p.name = node_name
+    p.amount = 28
+    p.lifetime = 0.65
+    p.one_shot = false
+    p.emitting = false
+    p.texture = PARTICLE_TEX
+    p.modulate = tint
+    var material := ParticleProcessMaterial.new()
+    material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+    material.emission_sphere_radius = 18.0
+    material.direction = Vector3(0, -1, 0)
+    material.spread = 180.0
+    material.initial_velocity_min = 45.0
+    material.initial_velocity_max = 130.0
+    material.gravity = Vector3(0, 170.0, 0)
+    material.scale_min = 0.25
+    material.scale_max = 0.65
+    material.color = tint
+    p.process_material = material
+    return p
+
+func _set_combat_animation(state: String) -> void:
+    sprite_anim_state = state
+    if hero_sprite and hero_sprite.sprite_frames.has_animation(state):
+        hero_sprite.play(state)
+    if boss_sprite and boss_sprite.sprite_frames.has_animation(state):
+        boss_sprite.play(state)
+
+func _emit_combat_particles(hero: bool, amount: int = 18) -> void:
+    var p := combat_particles if hero else boss_particles
+    if not p:
+        return
+    p.amount = amount
+    p.restart()
+    p.emitting = true
+
+func _update_combat_sprite_layer(delta: float) -> void:
+    if not hero_sprite or not boss_sprite:
+        return
+    hero_sprite.position = Vector2(hero_x, hero_y - 18.0)
+    boss_sprite.position = Vector2(snake_x if boss_kind == "snake" else 575.0, 330.0)
+    if screen_mode != "level":
+        hero_sprite.visible = false
+        boss_sprite.visible = false
+        combat_particles.emitting = false
+        boss_particles.emitting = false
+        return
+    hero_sprite.visible = true
+    boss_sprite.visible = combat_active and not level_won
+    if boss_kind == "guardian":
+        boss_sprite.sprite_frames = _make_sprite_frames(GUARDIAN_PRO_TEX)
+    elif boss_kind == "beast":
+        boss_sprite.sprite_frames = _make_sprite_frames(BEAST_PRO_TEX)
+    elif boss_kind == "dragon":
+        boss_sprite.sprite_frames = _make_sprite_frames(DRAGON_PRO_TEX)
+    else:
+        boss_sprite.sprite_frames = _make_sprite_frames(SNAKE_PRO_TEX)
+    if boss_phase == "windup":
+        boss_sprite.scale = Vector2.ONE * (0.82 + sin(boss_phase_t * 14.0) * 0.045)
+    elif boss_phase == "impact":
+        boss_sprite.scale = Vector2.ONE * 0.90
+        boss_sprite.rotation = sin(boss_phase_t * 38.0) * 0.045
+    else:
+        boss_sprite.scale = Vector2.ONE * (0.82 + sin(art_idle_phase) * 0.018)
+        boss_sprite.rotation = 0.0
+    hero_sprite.scale = Vector2.ONE * (0.72 + sin(art_idle_phase * 0.8) * 0.012)
+    if boss_phase == "recovery":
+        hero_sprite.play(&"hit" if boss_damage_window else &"idle")
+    elif boss_phase == "windup":
+        boss_sprite.play(&"attack")
+    elif boss_phase == "impact":
+        boss_sprite.play(&"attack")
+    elif level_won:
+        boss_sprite.play(&"defeat")
+    else:
+        boss_sprite.play(&"idle")
 
 func _new_level() -> void:
     board.clear()
@@ -1399,6 +1530,8 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         if combat_active:
             _apply_snake_damage(matches.size())
         _spawn_attack_effects(matches.size())
+    _set_combat_animation("attack")
+    _emit_combat_particles(true, mini(40, 14 + matches.size() * 4))
         _collapse()
         refill_anim = 0.0
         hero_attack = 1.0
@@ -1630,6 +1763,8 @@ func _spawn_boss_attack_sequence(damage: int) -> void:
         boss_projectiles.append({"p": origin + Vector2(0, 18), "target": target + Vector2(0, -18), "t": 0.04, "life": 0.30, "color": Color("fff1a8")})
 
 func _spawn_boss_defeat_vfx() -> void:
+    _set_combat_animation("defeat")
+    _emit_combat_particles(false, 60)
     var p := Vector2(575, 330)
     _spawn_impact_burst(p, 190.0, Color("ffe17a"), 0.72)
     _spawn_impact_burst(p, 105.0, Color("ff704f"), 0.46)
