@@ -429,80 +429,67 @@ func _inside(cell: Vector2i) -> bool:
 
 func _try_swap(a: Vector2i, b: Vector2i) -> void:
     _swap(a, b)
-
-    if _is_special(board[a.y][a.x]) or _is_special(board[b.y][b.x]):
-        moves -= 1
-        combo += 1
-        busy = true
-        var special_matches := _activate_special_swap(a, b)
-        if special_matches.is_empty():
-            _swap(a, b)
-            busy = false
-            return
-        last_match_count = special_matches.size()
-        score += special_matches.size() * 18 * (1 + mini(combo - 1, 3))
-        level_coins += maxi(1, special_matches.size() / 4)
-        _spawn_match_bursts(special_matches)
-        _clear_matches(special_matches)
-        _collapse()
-        refill_anim = 0.0
-        hero_attack = 1.0
-        _spawn_attack_effects(special_matches.size())
-        _apply_adventure_damage(special_matches.size())
-        busy = false
-        _check_goal()
-        queue_redraw()
-        return
-
-    var matches := _find_matches()
+    var has_special := _is_special(board[a.y][a.x]) or _is_special(board[b.y][b.x])
+    var matches := _activate_special_swap(a, b) if has_special else _find_matches()
 
     if matches.is_empty():
         _swap(a, b)
         combo = 0
+        cascade = 0
         message = "Pas de combinaison : essaie un autre mouvement."
         queue_redraw()
         return
 
     moves -= 1
-    combo += 1
-    last_match_count = matches.size()
-    var multiplier := 1 + mini(combo - 1, 3)
-    var points := matches.size() * 10 * multiplier
-    score += points
-    level_coins += maxi(1, matches.size() / 3)
-
-    if goal_kind == "collect":
-        for cell in matches:
-            if board[cell.y][cell.x] == goal_color:
-                goal_progress = mini(goal_target, goal_progress + 1)
-
-    var special_cell := matches[mini(matches.size() / 2, matches.size() - 1)]
-    var special_value := -1
-    if matches.size() >= 5:
-        special_value = SPECIAL_BOMB
-    elif matches.size() == 4:
-        special_value = SPECIAL_H
-        if _vertical_match_at(matches, special_cell):
-            special_value = SPECIAL_V
-    if special_value >= 0 and goal_kind == "special":
-        goal_progress = mini(goal_target, goal_progress + 1)
-
     busy = true
-    message = "+%d points • %s" % [points, _level_objective()]
-    _spawn_match_bursts(matches)
-    _clear_matches(matches, special_cell, special_value)
-    _collapse()
-    refill_anim = 0.0
-    hero_attack = 1.0
-    _spawn_attack_effects(matches.size())
-    _apply_adventure_damage(matches.size())
-    _check_goal()
+    cascade = 0
+    combo = 0
+    _resolve_cascade(matches)
     if moves <= 0 and not level_won:
         level_lost = true
         message = "Niveau échoué • touche pour réessayer"
     busy = false
     queue_redraw()
 
+func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
+    var matches := initial_matches
+    while not matches.is_empty() and cascade < 12:
+        cascade += 1
+        combo += 1
+        combo_flash = 1.0
+        last_match_count = matches.size()
+        var multiplier := 1 + mini(combo - 1, 4)
+        var points := matches.size() * 12 * multiplier
+        score += points
+        level_coins += maxi(1, matches.size() / 3)
+
+        if goal_kind == "collect":
+            for cell in matches:
+                if board[cell.y][cell.x] == goal_color:
+                    goal_progress = mini(goal_target, goal_progress + 1)
+
+        var special_cell := matches[mini(matches.size() / 2, matches.size() - 1)]
+        var special_value := -1
+        if matches.size() >= 5:
+            special_value = SPECIAL_BOMB
+        elif matches.size() == 4:
+            special_value = SPECIAL_H if not _vertical_match_at(matches, special_cell) else SPECIAL_V
+        if special_value >= 0 and goal_kind == "special":
+            goal_progress = mini(goal_target, goal_progress + 1)
+
+        message = "COMBO x%d  +%d" % [combo, points]
+        _spawn_match_bursts(matches)
+        _clear_matches(matches, special_cell, special_value)
+        _apply_adventure_damage(matches.size())
+        _spawn_attack_effects(matches.size())
+        _collapse()
+        refill_anim = 0.0
+        hero_attack = 1.0
+        screen_shake = minf(1.0, 0.18 + cascade * 0.06)
+        await get_tree().create_timer(0.10).timeout
+        matches = _find_matches()
+
+    _check_goal()
 func _apply_adventure_damage(match_count: int) -> void:
     if level_won or obstacle_index >= obstacle_hp.size():
         return
