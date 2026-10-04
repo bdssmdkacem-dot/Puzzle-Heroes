@@ -197,7 +197,7 @@ var sfx_cursor := 0
 
 func _ready() -> void:
     randomize()
-    _setup_combat_nodes()
+    # TEMP DIAGNOSTIC: Premium 10 combat nodes disabled until Android startup is verified.
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
