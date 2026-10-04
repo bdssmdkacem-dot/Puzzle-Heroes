@@ -136,20 +136,21 @@ const SPECIAL_V := 6
 const SPECIAL_BOMB := 7
 const SPECIAL_COLOR := 8
 
-const HERO_TEX := preload("res://assets/art/hero.svg")
-const SNAKE_TEX := preload("res://assets/art/snake.svg")
-const ROCK_TEX := preload("res://assets/art/rock.svg")
-const CAPTIVE_TEX := preload("res://assets/art/captive.svg")
-const SCENE_TEX := preload("res://assets/art/scene.svg")
-const GEMS_TEX := preload("res://assets/art/gems.svg")
-const HERO_PRO_TEX := preload("res://assets/pack/hero_pro.svg")
-const SNAKE_PRO_TEX := preload("res://assets/pack/boss_snake_pro.svg")
-const GUARDIAN_PRO_TEX := preload("res://assets/pack/boss_guardian_pro.svg")
-const BEAST_PRO_TEX := preload("res://assets/pack/boss_beast_pro.svg")
-const DRAGON_PRO_TEX := preload("res://assets/pack/boss_dragon_pro.svg")
-const CAPTIVE_PRO_TEX := preload("res://assets/pack/captive_pro.svg")
-const RUINS_ENV_TEX := preload("res://assets/pack/ruins.svg")
-const PARTICLE_TEX := preload("res://assets/pack/particle_glow.svg")
+var HERO_TEX: Texture2D
+var SNAKE_TEX: Texture2D
+var ROCK_TEX: Texture2D
+var CAPTIVE_TEX: Texture2D
+var SCENE_TEX: Texture2D
+var GEMS_TEX: Texture2D
+var HERO_PRO_TEX: Texture2D
+var SNAKE_PRO_TEX: Texture2D
+var GUARDIAN_PRO_TEX: Texture2D
+var BEAST_PRO_TEX: Texture2D
+var DRAGON_PRO_TEX: Texture2D
+var CAPTIVE_PRO_TEX: Texture2D
+var RUINS_ENV_TEX: Texture2D
+var PARTICLE_TEX: Texture2D
+var art_assets_ready := false
 
 # Premium Content 7: authored 2D animation state.
 var art_idle_phase := 0.0
@@ -365,9 +366,29 @@ func _update_music_audio() -> void:
             sample += sin(TAU * freq * 4.0 * t) * 0.018
         music_playback.push_frame(Vector2(sample, sample))
 
+func _ensure_art_assets() -> void:
+    if art_assets_ready:
+        return
+    HERO_TEX = load("res://assets/art/hero.svg") as Texture2D
+    SNAKE_TEX = load("res://assets/art/snake.svg") as Texture2D
+    ROCK_TEX = load("res://assets/art/rock.svg") as Texture2D
+    CAPTIVE_TEX = load("res://assets/art/captive.svg") as Texture2D
+    SCENE_TEX = load("res://assets/art/scene.svg") as Texture2D
+    GEMS_TEX = load("res://assets/art/gems.svg") as Texture2D
+    HERO_PRO_TEX = load("res://assets/pack/hero_pro.svg") as Texture2D
+    SNAKE_PRO_TEX = load("res://assets/pack/boss_snake_pro.svg") as Texture2D
+    GUARDIAN_PRO_TEX = load("res://assets/pack/boss_guardian_pro.svg") as Texture2D
+    BEAST_PRO_TEX = load("res://assets/pack/boss_beast_pro.svg") as Texture2D
+    DRAGON_PRO_TEX = load("res://assets/pack/boss_dragon_pro.svg") as Texture2D
+    CAPTIVE_PRO_TEX = load("res://assets/pack/captive_pro.svg") as Texture2D
+    RUINS_ENV_TEX = load("res://assets/pack/ruins.svg") as Texture2D
+    PARTICLE_TEX = load("res://assets/pack/particle_glow.svg") as Texture2D
+    art_assets_ready = true
+
 func _setup_combat_nodes() -> void:
     if combat_layer:
         return
+    _ensure_art_assets()
     combat_layer = Node2D.new()
     combat_layer.name = "CombatAnimationLayer"
     add_child(combat_layer)
@@ -901,6 +922,7 @@ func _story_choice_text() -> String:
     return "اختر قرارك"
 
 func _draw_story_screen() -> void:
+    _ensure_art_assets()
     var wid := world_id(story_level)
     var bg := Color("24180f")
     var accent := Color("e9b62f")
@@ -1219,6 +1241,7 @@ func _draw_top_hud() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(375, 48), "+5 حركات %d" % ability_extra_moves, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("ffe7aa"))
 
 func _draw_rescue_scene() -> void:
+    _ensure_art_assets()
     var wid := world_id(level_number)
     var arena := Color("3b2d20")
     var accent := Color("d7a52b")
@@ -1370,6 +1393,7 @@ func _draw_boss_character(pos: Vector2, story: bool = false) -> void:
     draw_string(ThemeDB.fallback_font, p + Vector2(-115 * scale, -145 * scale), "BOSS • " + _boss_name(), HORIZONTAL_ALIGNMENT_LEFT, 240 * scale, 18, Color("fff0c4"))
 
 func _draw_board() -> void:
+    _ensure_art_assets()
     var wid := world_id(level_number)
     var frame := Color("b98628")
     var inner := Color("e8d4a7")
