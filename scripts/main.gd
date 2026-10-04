@@ -60,6 +60,12 @@ var rescue_open := false
 var combat_active := false
 var snake_hp := 5
 var snake_hit_flash := 0.0
+var snake_recoil := 0.0
+var snake_shake := 0.0
+var hero_strike := 0.0
+var rock_impact := 0.0
+var rescue_celebration := 0.0
+var rescue_confetti: Array = []
 var effects: Array = []
 var refill_anim := 1.0
 var hero_attack := 0.0
@@ -107,6 +113,12 @@ func _process(delta: float) -> void:
     obstacle_flash = maxf(0.0, obstacle_flash - delta * 3.5)
     attack_flash = maxf(0.0, attack_flash - delta * 4.0)
     snake_hit_flash = maxf(0.0, snake_hit_flash - delta * 5.0)
+    snake_recoil = maxf(0.0, snake_recoil - delta * 4.5)
+    snake_shake = maxf(0.0, snake_shake - delta * 5.5)
+    hero_strike = maxf(0.0, hero_strike - delta * 5.0)
+    rock_impact = maxf(0.0, rock_impact - delta * 4.5)
+    rescue_celebration = maxf(0.0, rescue_celebration - delta * 1.6)
+    _update_rescue_confetti(delta)
     refill_anim = minf(1.0, refill_anim + delta * 3.8)
     hero_attack = maxf(0.0, hero_attack - delta * 3.8)
     screen_shake = maxf(0.0, screen_shake - delta * 4.0)
@@ -164,6 +176,12 @@ func _new_level() -> void:
     combat_active = false
     snake_hp = 5
     snake_hit_flash = 0.0
+    snake_recoil = 0.0
+    snake_shake = 0.0
+    hero_strike = 0.0
+    rock_impact = 0.0
+    rescue_celebration = 0.0
+    rescue_confetti.clear()
     effects.clear()
     refill_anim = 1.0
     hero_attack = 0.0
@@ -189,6 +207,7 @@ func _draw() -> void:
     _draw_tile_trails()
     _draw_vfx_rings()
     _draw_effects()
+    _draw_rescue_confetti()
     _draw_rescue_badge()
     if level_won or level_lost:
         _draw_end_panel()
@@ -328,19 +347,27 @@ func _draw_rescue_scene() -> void:
 
 func _draw_hero(pos: Vector2) -> void:
     var bob := sin(hero_bounce) * 3.0
-    var recoil := hero_attack * -18.0
-    var size := Vector2(126, 160)
+    var strike := sin((1.0 - hero_strike) * PI) if hero_strike > 0.0 else 0.0
+    var recoil := hero_attack * -18.0 + strike * 28.0
+    var size := Vector2(126, 160) * (1.0 + strike * 0.035)
     var p := pos + Vector2(recoil, bob)
     draw_texture_rect(HERO_TEX, Rect2(p - size * 0.5, size), false)
-    if hero_attack > 0.0:
-        draw_line(p + Vector2(48, -12), p + Vector2(90, -12), Color(1.0, 0.84, 0.25, hero_attack), 7)
+    if hero_attack > 0.0 or hero_strike > 0.0:
+        var reach := 42.0 + strike * 52.0
+        draw_line(p + Vector2(42, -10), p + Vector2(reach, -10), Color(1.0, 0.84, 0.25, maxf(hero_attack, strike)), 7.0)
+        draw_circle(p + Vector2(reach, -10), 8.0 + strike * 7.0, Color(1.0, 0.94, 0.55, strike * 0.8))
 
 func _draw_large_snake(pos: Vector2) -> void:
-    var scale := 0.72 + snake_hit_flash * 0.04
+    var hit := sin((1.0 - snake_hit_flash) * PI) if snake_hit_flash > 0.0 else 0.0
+    var shake := sin(hero_bounce * 34.0) * snake_shake * 9.0
+    var recoil := -snake_recoil * 28.0
+    var scale := 0.72 + hit * 0.035
     var size := Vector2(600, 300) * scale
-    draw_texture_rect(SNAKE_TEX, Rect2(pos - size * 0.5, size), false)
+    var p := pos + Vector2(recoil + shake, 0)
+    draw_texture_rect(SNAKE_TEX, Rect2(p - size * 0.5, size), false)
     if snake_hit_flash > 0.0:
-        draw_circle(pos + Vector2(160, 45), 58, Color(1, 0.9, 0.2, snake_hit_flash * 0.28))
+        draw_circle(p + Vector2(160, 45), 58.0 + hit * 12.0, Color(1, 0.9, 0.2, snake_hit_flash * 0.28))
+        draw_arc(p + Vector2(160, 45), 72.0 + hit * 16.0, 0, TAU, 28, Color(1, 0.55, 0.2, snake_hit_flash * 0.75), 8.0)
 
 func _draw_board() -> void:
     draw_rect(Rect2(24, 666, 672, 580), Color("b98628"))
@@ -581,6 +608,8 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         _spawn_match_bursts(matches)
         _clear_matches(matches, special_cell, special_value)
         _apply_adventure_damage(matches.size())
+        if combat_active:
+            _apply_snake_damage(matches.size())
         _spawn_attack_effects(matches.size())
         _collapse()
         refill_anim = 0.0
@@ -603,8 +632,11 @@ func _apply_adventure_damage(match_count: int) -> void:
 
     obstacle_hp[obstacle_index] = max(0, obstacle_hp[obstacle_index] - damage)
     obstacle_flash = 1.0
+    rock_impact = 1.0
     attack_flash = 1.0
     snake_alert = 1.0
+    hero_strike = 1.0
+    _spawn_rock_impact(obstacle_index)
 
     if obstacle_hp[obstacle_index] > 0:
         message = "COUP ! Rocher %d/%d • encore %d" % [
@@ -644,10 +676,14 @@ func _apply_snake_damage(match_count: int) -> void:
     if match_count >= 7:
         damage = 3
     snake_hp = max(0, snake_hp - damage)
+    snake_recoil = 1.0
+    snake_shake = 1.0
+    hero_strike = 1.0
     snake_hit_flash = 1.0
     snake_alert = 1.0
     score += damage * 25
     _spawn_attack_effects(match_count)
+    _spawn_snake_hit_vfx(damage)
 
     if snake_hp > 0:
         message = "TOUCHE ! Le serpent perd %d PV." % damage
@@ -669,10 +705,69 @@ func _apply_snake_damage(match_count: int) -> void:
         campaign_complete = true
     _save_progress()
     message = "SAUVETAGE RÉUSSI ! +%d ★  +%d ◆" % [earned_stars, level_coins + earned_stars * 5]
+    rescue_celebration = 1.0
+    _spawn_rescue_celebration()
     var rescue_tween := create_tween()
     rescue_tween.set_parallel(true)
     rescue_tween.tween_property(self, "hero_x", 560.0, 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
     rescue_tween.tween_property(self, "hero_y", 375.0, 0.65).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func _spawn_rock_impact(index: int) -> void:
+    var p := Vector2(165, 560)
+    _spawn_vfx_ring(p, 12.0, 105.0, Color(0.92, 0.78, 0.52, 0.9), 0.34)
+    for i in range(12):
+        var angle := TAU * float(i) / 12.0
+        effects.append({
+            "p": p,
+            "v": Vector2(cos(angle), sin(angle)) * (70.0 + randi() % 120),
+            "t": 0.0,
+            "life": 0.42,
+            "target": p,
+            "kind": 2
+        })
+
+func _spawn_snake_hit_vfx(damage: int) -> void:
+    var p := Vector2(575, 330)
+    _spawn_vfx_ring(p, 20.0, 125.0 + damage * 12.0, Color(1.0, 0.36, 0.18, 0.95), 0.38)
+    for i in range(8 + damage * 2):
+        var angle := TAU * float(i) / float(8 + damage * 2)
+        effects.append({
+            "p": p,
+            "v": Vector2(cos(angle), sin(angle)) * (100.0 + randi() % 100),
+            "t": 0.0,
+            "life": 0.36 + float(randi() % 15) / 100.0,
+            "target": p,
+            "kind": 3
+        })
+
+func _spawn_rescue_celebration() -> void:
+    rescue_confetti.clear()
+    for i in range(34):
+        rescue_confetti.append({
+            "p": Vector2(540, 430),
+            "v": Vector2(-90.0 + randi() % 181, -220.0 - randi() % 130),
+            "t": 0.0,
+            "life": 1.4 + float(randi() % 80) / 100.0,
+            "rot": float(randi() % 6)
+        })
+    _spawn_vfx_ring(Vector2(540, 430), 20.0, 180.0, Color(1.0, 0.84, 0.28, 1.0), 0.65)
+
+func _update_rescue_confetti(delta: float) -> void:
+    for i in range(rescue_confetti.size() - 1, -1, -1):
+        var item: Dictionary = rescue_confetti[i]
+        item["t"] = float(item["t"]) + delta
+        item["p"] = Vector2(item["p"]) + Vector2(item["v"]) * delta
+        item["v"] = Vector2(item["v"]) + Vector2(0, 260.0) * delta
+        rescue_confetti[i] = item
+        if float(item["t"]) >= float(item["life"]):
+            rescue_confetti.remove_at(i)
+
+func _draw_rescue_confetti() -> void:
+    for item in rescue_confetti:
+        var life := clampf(1.0 - float(item["t"]) / float(item["life"]), 0.0, 1.0)
+        var p := Vector2(item["p"])
+        var s := 5.0 + 3.0 * life
+        draw_rect(Rect2(p - Vector2(s, s * 0.5), Vector2(s * 2.0, s)), Color(1.0, 0.82, 0.25, life), true)
 
 func _spawn_match_bursts(matches: Array[Vector2i]) -> void:
     for cell in matches:
@@ -762,6 +857,12 @@ func _draw_effects() -> void:
             draw_circle(p, 7.0 + 9.0 * life, Color(1.0, 0.82, 0.22, life))
             draw_circle(p, 3.0, Color(1, 1, 1, life))
             draw_line(p, p - Vector2(e["v"]) * 0.08, Color(1.0, 0.55, 0.12, life), 3.0)
+        elif kind == 2:
+            draw_circle(p, 6.0 + 7.0 * life, Color(0.72, 0.64, 0.55, life))
+            draw_line(p, p - Vector2(e["v"]) * 0.06, Color(0.96, 0.88, 0.72, life), 4.0)
+        elif kind == 3:
+            draw_circle(p, 5.0 + 7.0 * life, Color(1.0, 0.34, 0.12, life))
+            draw_line(p, p - Vector2(e["v"]) * 0.08, Color(1.0, 0.86, 0.36, life), 4.0)
         else:
             draw_circle(p, 5.0 + 6.0 * life, Color(1.0, 0.78, 0.2, life))
             draw_circle(p, 2.5, Color(1, 1, 1, life))
