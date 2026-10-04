@@ -37,6 +37,7 @@ jobs:
           "$SDKMANAGER" --version
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           adb version
           java -version
 
