@@ -1434,17 +1434,16 @@ func _damage_hazards(matches: Array[Vector2i]) -> void:
 func _boss_mechanic() -> void:
     if not combat_active:
         return
-    boss_turn += 1
     match boss_kind:
         "snake":
             if boss_turn % 2 == 0:
                 var c := Vector2i(randi() % COLS, randi() % ROWS)
-                hazards[c.y][c.x] = 1
-                message = "الأفعى تسمّم اللوحة! اكسر الجليد!"
+                hazards[c.y][c.x] = 3
+                message = "☠ الأفعى نشرت السم! اكسر اللعنة!"
         "guardian":
-            boss_enraged = boss_turn % 2 == 0
-            if boss_enraged:
-                message = "الحارس رفع الدرع! اضرب بـ5+ قطع."
+            if boss_turn % 2 == 0:
+                guardian_shield = true
+                message = "🛡 الحارس رفع الدرع! اضرب بـ5+ قطع."
         "beast":
             if snake_hp <= int(boss_max_hp * 0.5):
                 boss_enraged = true
@@ -1542,8 +1541,15 @@ func _apply_snake_damage(match_count: int) -> void:
         damage = 2
     if match_count >= 7:
         damage = 3
-    if boss_kind == "guardian" and boss_enraged and match_count < 5:
-        damage = 0
+    if boss_kind == "guardian" and guardian_shield:
+        if match_count < 5:
+            damage = 0
+            message = "🛡 الدرع صد الضربة! اصنع 5+."
+        else:
+            guardian_shield = false
+            guardian_shield_break = 1.0
+            _spawn_impact_burst(Vector2(575, 330), 155.0, Color("9feeff"), 0.55)
+            _spawn_boss_defeat_vfx()
     snake_hp = max(0, snake_hp - damage)
     snake_recoil = 1.0
     snake_shake = 1.0
