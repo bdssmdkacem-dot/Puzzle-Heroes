@@ -198,7 +198,6 @@ var sfx_cursor := 0
 func _ready() -> void:
     randomize()
     _setup_combat_nodes()
-    _setup_audio_system()
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
@@ -206,7 +205,6 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
     audio_time += delta
-    _update_music_audio()
     hero_bounce += delta * 5.0
     art_idle_phase += delta * 4.0
     art_attack_phase = maxf(0.0, art_attack_phase - delta * 3.8)
