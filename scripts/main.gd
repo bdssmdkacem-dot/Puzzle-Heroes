@@ -32,6 +32,17 @@ var level_coins := 0
 var combo := 0
 var best_score := 0
 var campaign_complete := false
+var screen_mode := "map"
+var unlocked_levels: Array = [1]
+var level_stars: Array = [0,0,0,0,0,0,0,0,0,0,0]
+var ability_hammer := 2
+var ability_blast := 1
+var ability_extra_moves := 1
+var chests_opened := 0
+var level_modifier := "NORMAL"
+var boss_kind := "none"
+var boss_max_hp := 0
+var chest_reward := 0
 
 var dragging := false
 var drag_start := Vector2.ZERO
@@ -114,7 +125,7 @@ const GEMS_TEX := preload("res://assets/art/gems.svg")
 func _ready() -> void:
     randomize()
     _load_progress()
-    _new_level()
+    screen_mode = "map"
     queue_redraw()
 
 func _process(delta: float) -> void:
@@ -173,6 +184,40 @@ func _new_level() -> void:
 
     score = 0
     moves = 24 + level_number * 2
+    level_modifier = "NORMAL"
+    boss_kind = boss_for_level(level_number)
+    boss_max_hp = 0
+    match level_number:
+        2:
+            moves = 22
+            level_modifier = "سباق جمع"
+        3:
+            moves = 26
+            level_modifier = "زعيم الأفعى"
+        4:
+            moves = 20
+            level_modifier = "بوستر أولاً"
+        5:
+            moves = 18
+            level_modifier = "ضغط الحركات"
+        6:
+            moves = 27
+            level_modifier = "زعيم الحارس"
+        7:
+            moves = 21
+            level_modifier = "سلسلة خاصة"
+        8:
+            moves = 19
+            level_modifier = "جمع سريع"
+        9:
+            moves = 28
+            level_modifier = "زعيم الوحش"
+        10:
+            moves = 32
+            level_modifier = "المواجهة النهائية"
+    if boss_kind != "none":
+        boss_max_hp = 5 + (level_number / 3) * 2
+        snake_hp = boss_max_hp
     level_coins = 0
     combo = 0
     cascade = 0
@@ -215,14 +260,16 @@ func _new_level() -> void:
     tile_trails.clear()
 
     _configure_level_goal()
-    message = _level_objective()
+    message = _level_objective() + " • " + level_modifier
     level_won = false
     level_lost = false
     busy = false
 
 func _draw() -> void:
-    # Full-screen portrait adventure layout inspired by premium mobile puzzle games.
     draw_rect(Rect2(0, 0, 720, 1280), Color("17120f"))
+    if screen_mode == "map":
+        _draw_campaign_map()
+        return
     var impact := sin((1.0 - screen_shake) * PI) if screen_shake > 0.0 else 0.0
     camera_kick = Vector2(sin(hero_anim_phase * 17.0), cos(hero_anim_phase * 13.0)) * screen_shake * 7.0
     draw_set_transform(camera_kick, 0.0, Vector2.ONE * camera_zoom)
@@ -242,9 +289,12 @@ func _configure_level_goal() -> void:
     goal_progress = 0
     goal_color = (level_number - 1) % COLORS.size()
     match level_number:
-        2, 5, 8:
+        2, 8:
             goal_kind = "collect"
-            goal_target = 12 + level_number * 2
+            goal_target = 12 + level_number
+        5:
+            goal_kind = "collect"
+            goal_target = 18
         4, 7:
             goal_kind = "special"
             goal_target = 2
@@ -260,6 +310,94 @@ func _level_objective() -> String:
             return "CRÉE %d BOOSTERS" % goal_target
         _:
             return "DÉTRUIS LES OBSTACLES"
+
+func _start_level(selected_level: int) -> void:
+    if not _is_level_unlocked(selected_level):
+        return
+    level_number = selected_level
+    screen_mode = "level"
+    _new_level()
+
+func _is_level_unlocked(value: int) -> bool:
+    return value in unlocked_levels
+
+func _unlock_after_level(value: int) -> void:
+    var targets: Array = []
+    match value:
+        3:
+            targets = [4, 5]
+        4, 5:
+            targets = [6]
+        6:
+            targets = [7, 8]
+        7, 8:
+            targets = [9]
+        9:
+            targets = [10]
+        _:
+            if value < 10:
+                targets = [value + 1]
+    for target in targets:
+        if target not in unlocked_levels:
+            unlocked_levels.append(target)
+    unlocked_levels.sort()
+
+func boss_for_level(value: int) -> String:
+    match value:
+        3:
+            return "snake"
+        6:
+            return "guardian"
+        9:
+            return "beast"
+        10:
+            return "dragon"
+        _:
+            return "none"
+
+func _draw_campaign_map() -> void:
+    draw_rect(Rect2(0, 0, 720, 1280), Color("17120f"))
+    draw_rect(Rect2(0, 0, 720, 120), Color("2a211b"))
+    draw_string(ThemeDB.fallback_font, Vector2(42, 52), "خريطة المغامرة", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, Color("fff0bd"))
+    draw_string(ThemeDB.fallback_font, Vector2(42, 86), "اختر طريقك • افتح الصناديق • اهزم الزعماء", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("d8c39d"))
+    draw_string(ThemeDB.fallback_font, Vector2(525, 48), "★ %d" % stars, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("ffd45b"))
+    draw_string(ThemeDB.fallback_font, Vector2(525, 80), "◆ %d" % coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffe5a1"))
+    var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
+    var links := [[0,1],[1,2],[2,3],[2,4],[3,5],[4,5],[5,6],[5,7],[6,8],[7,8],[8,9]]
+    for link in links:
+        var a: Vector2 = nodes[link[0]]
+        var b: Vector2 = nodes[link[1]]
+        draw_line(a,b,Color("5d4934"),18)
+        draw_line(a,b,Color("c89a43"),5)
+    for i in range(nodes.size()):
+        var p: Vector2 = nodes[i]
+        var unlocked := _is_level_unlocked(i + 1)
+        var completed: int = level_stars[i + 1]
+        draw_circle(p,44,Color("30271f"))
+        draw_circle(p,39,Color("d1a04a") if unlocked else Color("4b443d"))
+        draw_circle(p,31,Color("4d3925") if unlocked else Color("272421"))
+        draw_string(ThemeDB.fallback_font,p+Vector2(-10,9),str(i+1),HORIZONTAL_ALIGNMENT_LEFT,-1,24,Color.WHITE if unlocked else Color("8c857b"))
+        if completed > 0:
+            draw_string(ThemeDB.fallback_font,p+Vector2(-28,62),"★".repeat(completed),HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("ffd45b"))
+        if boss_for_level(i + 1) != "none":
+            draw_circle(p+Vector2(29,-29),13,Color("9d3026"))
+            draw_string(ThemeDB.fallback_font,p+Vector2(22,-23),"B",HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color.WHITE)
+        if i + 1 in [3,6,9]:
+            draw_rect(Rect2(p+Vector2(-13,-63),Vector2(26,20)),Color("8d5a25"))
+            draw_rect(Rect2(p+Vector2(-10,-60),Vector2(20,14)),Color("ffd45b"),false,2)
+    draw_rect(Rect2(50,1100,620,110),Color("241c17"))
+    draw_rect(Rect2(65,1115,590,80),Color("3b2b20"),false,3)
+    draw_string(ThemeDB.fallback_font,Vector2(85,1145),"القدرات",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ffe7aa"))
+    draw_string(ThemeDB.fallback_font,Vector2(85,1177),"مطرقة %d   انفجار %d   +5 حركات %d" % [ability_hammer,ability_blast,ability_extra_moves],HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(410,1145),"المراحل المفتوحة: %d/10" % unlocked_levels.size(),HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("d7c29a"))
+    draw_string(ThemeDB.fallback_font,Vector2(410,1177),"اختر مرحلة للبدء",HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("fff0bd"))
+
+func _handle_map_tap(pos: Vector2) -> void:
+    var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
+    for i in range(nodes.size()):
+        if pos.distance_to(nodes[i]) <= 58.0:
+            _start_level(i + 1)
+            return
 
 func _draw_end_panel() -> void:
     draw_rect(Rect2(55, 350, 610, 430), Color(0.06, 0.04, 0.03, 0.96))
