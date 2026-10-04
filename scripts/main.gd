@@ -78,6 +78,10 @@ var snake_boss_phase := 0.0
 var boss_pulse := 0.0
 var cascade := 0
 var combo_flash := 0.0
+var fever := 0.0
+var fever_flash := 0.0
+var streak_best := 0
+var near_miss_flash := 0.0
 
 # Commercial tile animation state.
 var tile_offset: Array = []
@@ -134,6 +138,9 @@ func _process(delta: float) -> void:
     camera_zoom = lerpf(camera_zoom, 1.0, minf(1.0, delta * 7.0))
     camera_kick = camera_kick.lerp(Vector2.ZERO, minf(1.0, delta * 9.0))
     combo_flash = maxf(0.0, combo_flash - delta * 2.8)
+    fever = maxf(0.0, fever - delta)
+    fever_flash = maxf(0.0, fever_flash - delta * 3.0)
+    near_miss_flash = maxf(0.0, near_miss_flash - delta * 3.5)
     _update_tile_animations(delta)
     _update_booster_paths(delta)
     _update_vfx_rings(delta)
@@ -169,6 +176,10 @@ func _new_level() -> void:
     level_coins = 0
     combo = 0
     cascade = 0
+    fever = 0.0
+    fever_flash = 0.0
+    streak_best = 0
+    near_miss_flash = 0.0
     combo_flash = 0.0
     obstacle_hp.clear()
     for hp in OBSTACLE_MAX_HP:
@@ -587,6 +598,8 @@ func _play_swap_animation(a: Vector2i, b: Vector2i, rejected: bool) -> void:
     swap_a = a
     swap_b = b
     swap_rejected = rejected
+    if rejected:
+        near_miss_flash = 0.45
     swap_animating = true
     swap_anim_t = 1.0 if rejected else 0.0
     _spawn_tile_trail(a, b)
@@ -607,7 +620,15 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         combo_flash = 1.0
         last_match_count = matches.size()
         var multiplier := 1 + mini(combo - 1, 4)
+        if fever > 0.0:
+            multiplier *= 2
         var points := matches.size() * 12 * multiplier
+        streak_best = maxi(streak_best, combo)
+        if combo >= 4 and fever <= 0.0:
+            fever = 8.0
+            fever_flash = 1.0
+            screen_shake = maxf(screen_shake, 0.35)
+            camera_zoom = 1.035
         score += points
         level_coins += maxi(1, matches.size() / 3)
 
@@ -625,7 +646,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         if special_value >= 0 and goal_kind == "special":
             goal_progress = mini(goal_target, goal_progress + 1)
 
-        message = "COMBO x%d  +%d" % [combo, points]
+        message = ("FEVER!  " if fever > 0.0 else "") + "COMBO x%d  +%d" % [combo, points]
         _prime_match_animation(matches)
         await get_tree().create_timer(0.11).timeout
         _spawn_match_bursts(matches)
@@ -640,6 +661,9 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         screen_shake = minf(1.0, 0.18 + cascade * 0.06)
         await get_tree().create_timer(0.10).timeout
         matches = _find_matches()
+        if matches.size() == 0 and combo >= 2:
+            near_miss_flash = 1.0
+            message = "SÉRIE TERMINÉE ! Prépare le prochain COMBO."
 
     _check_goal()
 func _apply_adventure_damage(match_count: int) -> void:
