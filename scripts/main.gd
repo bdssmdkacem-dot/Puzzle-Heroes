@@ -678,7 +678,8 @@ func _spawn_match_bursts(matches: Array[Vector2i]) -> void:
     for cell in matches:
         var p := Vector2(BOARD_X + cell.x * CELL + (CELL - 5) * 0.5, BOARD_Y + cell.y * CELL + (CELL - 5) * 0.5)
         _spawn_vfx_ring(p, 16.0, 72.0, Color(1.0, 0.78, 0.22, 0.9), 0.30)
-        for i in range(10):            var angle := TAU * float(i) / 8.0
+        for i in range(10):
+            var angle := TAU * float(i) / 10.0
             effects.append({
                 "p": p,
                 "v": Vector2(cos(angle), sin(angle)) * (75.0 + randi() % 80),
