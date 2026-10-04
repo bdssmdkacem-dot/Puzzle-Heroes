@@ -49,6 +49,9 @@ var daily_kind := "matches"
 var daily_target := 20
 var daily_progress := 0
 var daily_claimed := false
+var hazards: Array = []
+var boss_turn := 0
+var boss_enraged := false
 
 var dragging := false
 var drag_start := Vector2.ZERO
@@ -120,6 +123,7 @@ var goal_color := 0
 const SPECIAL_H := 5
 const SPECIAL_V := 6
 const SPECIAL_BOMB := 7
+const SPECIAL_COLOR := 8
 
 const HERO_TEX := preload("res://assets/art/hero.svg")
 const SNAKE_TEX := preload("res://assets/art/snake.svg")
@@ -206,22 +210,22 @@ func _new_level() -> void:
             level_modifier = "بوستر أولاً"
         5:
             moves = 18
-            level_modifier = "ضغط الحركات"
+            level_modifier = "جليد • لا يذوب إلا بالضرب"
         6:
             moves = 27
-            level_modifier = "زعيم الحارس"
+            level_modifier = "زعيم الحارس • درع + أقفاص"
         7:
             moves = 21
             level_modifier = "سلسلة خاصة"
         8:
             moves = 19
-            level_modifier = "جمع سريع"
+            level_modifier = "جليد • جمع سريع"
         9:
             moves = 28
-            level_modifier = "زعيم الوحش"
+            level_modifier = "زعيم الوحش • غضب + أقفاص"
         10:
             moves = 32
-            level_modifier = "المواجهة النهائية"
+            level_modifier = "التنين • لعنة + فوضى"
     if boss_kind != "none":
         boss_max_hp = 5 + int(level_number / 3) * 2
         snake_hp = boss_max_hp
@@ -265,6 +269,14 @@ func _new_level() -> void:
     booster_paths.clear()
     vfx_rings.clear()
     tile_trails.clear()
+    hazards.clear()
+    for y in ROWS:
+        hazards.append([])
+        for x in COLS:
+            hazards[y].append(0)
+    boss_turn = 0
+    boss_enraged = false
+    _configure_level_hazards()
 
     _configure_level_goal()
     message = _level_objective() + " • " + level_modifier
@@ -291,6 +303,24 @@ func _draw() -> void:
     _draw_rescue_badge()
     if level_won or level_lost:
         _draw_end_panel()
+
+func _configure_level_hazards() -> void:
+    match level_number:
+        5:
+            for cell in [Vector2i(1, 1), Vector2i(3, 1), Vector2i(5, 1), Vector2i(2, 4), Vector2i(4, 4)]:
+                hazards[cell.y][cell.x] = 1
+        6:
+            for cell in [Vector2i(0, 2), Vector2i(6, 2), Vector2i(1, 4), Vector2i(5, 4)]:
+                hazards[cell.y][cell.x] = 2
+        8:
+            for cell in [Vector2i(1, 0), Vector2i(5, 0), Vector2i(0, 5), Vector2i(6, 5), Vector2i(3, 3)]:
+                hazards[cell.y][cell.x] = 1
+        9:
+            for cell in [Vector2i(0, 1), Vector2i(6, 1), Vector2i(0, 4), Vector2i(6, 4)]:
+                hazards[cell.y][cell.x] = 2
+        10:
+            for cell in [Vector2i(1, 1), Vector2i(5, 1), Vector2i(1, 4), Vector2i(5, 4), Vector2i(3, 2)]:
+                hazards[cell.y][cell.x] = 3
 
 func _configure_level_goal() -> void:
     goal_progress = 0
@@ -649,6 +679,15 @@ func _draw_board() -> void:
             var center := Vector2(BOARD_X + x * CELL + (CELL - 5) * 0.5, BOARD_Y + y * CELL + (CELL - 5) * 0.5)
             center += tile_offset[y][x]
             _draw_gem_animated(center, value, tile_scale[y][x], tile_alpha[y][x])
+            if hazards[y][x] == 1:
+                draw_arc(center, 31, 0, TAU, 20, Color(0.55, 0.86, 1.0, 0.9), 6.0)
+                draw_line(center + Vector2(-20, 18), center + Vector2(20, -18), Color(0.75, 0.95, 1.0, 0.8), 4.0)
+            elif hazards[y][x] == 2:
+                draw_rect(Rect2(center - Vector2(31,31), Vector2(62,62)), Color(0.95,0.72,0.24,0.28), true)
+                draw_arc(center, 29, 0, TAU, 18, Color("e9b62f"), 5.0)
+            elif hazards[y][x] == 3:
+                draw_circle(center, 35, Color(0.28,0.12,0.38,0.65))
+                draw_arc(center, 30, 0, TAU, 20, Color("b957e8"), 5.0)
 
     if swap_animating and _inside(swap_a) and _inside(swap_b):
         var va: int = board[swap_a.y][swap_a.x]
@@ -922,7 +961,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         var special_cell := matches[mini(matches.size() / 2, matches.size() - 1)]
         var special_value := -1
         if matches.size() >= 5:
-            special_value = SPECIAL_BOMB
+            special_value = SPECIAL_COLOR
         elif matches.size() == 4:
             special_value = SPECIAL_H if not _vertical_match_at(matches, special_cell) else SPECIAL_V
         if special_value >= 0 and goal_kind == "special":
@@ -934,6 +973,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         await get_tree().create_timer(0.11).timeout
         _spawn_match_bursts(matches)
         _clear_matches(matches, special_cell, special_value)
+        _damage_hazards(matches)
         _apply_adventure_damage(matches.size())
         if combat_active:
             _apply_snake_damage(matches.size())
@@ -949,6 +989,49 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             message = "SÉRIE TERMINÉE ! Prépare le prochain COMBO."
 
     _check_goal()
+func _damage_hazards(matches: Array[Vector2i]) -> void:
+    for cell in matches:
+        if not _inside(cell):
+            continue
+        if hazards[cell.y][cell.x] == 1:
+            hazards[cell.y][cell.x] = 0
+            _spawn_vfx_ring(_cell_center(cell), 18.0, 70.0, Color(0.45, 0.85, 1.0, 0.9), 0.28)
+        elif hazards[cell.y][cell.x] == 2:
+            hazards[cell.y][cell.x] = 0
+            _spawn_vfx_ring(_cell_center(cell), 18.0, 82.0, Color(0.95, 0.75, 0.28, 0.9), 0.30)
+        elif hazards[cell.y][cell.x] == 3:
+            hazards[cell.y][cell.x] = 2
+
+func _boss_mechanic() -> void:
+    if not combat_active:
+        return
+    boss_turn += 1
+    match boss_kind:
+        "snake":
+            if boss_turn % 2 == 0:
+                var c := Vector2i(randi() % COLS, randi() % ROWS)
+                hazards[c.y][c.x] = 1
+                message = "الأفعى تسمّم اللوحة! اكسر الجليد!"
+        "guardian":
+            boss_enraged = boss_turn % 2 == 0
+            if boss_enraged:
+                message = "الحارس رفع الدرع! اضرب بـ5+ قطع."
+        "beast":
+            if snake_hp <= int(boss_max_hp * 0.5):
+                boss_enraged = true
+                moves = max(1, moves - 1)
+                var c := Vector2i(randi() % COLS, randi() % ROWS)
+                hazards[c.y][c.x] = 2
+                message = "الوحش في حالة غضب! -1 حركة."
+        "dragon":
+            if boss_turn % 2 == 0:
+                for y in ROWS:
+                    for x in COLS:
+                        if board[y][x] >= 0 and randi() % 5 == 0:
+                            board[y][x] = randi() % COLORS.size()
+                screen_shake = maxf(screen_shake, 0.35)
+                message = "التنين يبعثر الساحة!"
+
 func _apply_adventure_damage(match_count: int) -> void:
     if level_won or obstacle_index >= obstacle_hp.size():
         return
@@ -1027,6 +1110,8 @@ func _apply_snake_damage(match_count: int) -> void:
         damage = 2
     if match_count >= 7:
         damage = 3
+    if boss_kind == "guardian" and boss_enraged and match_count < 5:
+        damage = 0
     snake_hp = max(0, snake_hp - damage)
     snake_recoil = 1.0
     snake_shake = 1.0
@@ -1039,6 +1124,7 @@ func _apply_snake_damage(match_count: int) -> void:
     score += damage * 25
     _spawn_attack_effects(match_count)
     _spawn_snake_hit_vfx(damage)
+    _boss_mechanic()
 
     if snake_hp > 0:
         message = "TOUCHE ! Le serpent perd %d PV." % damage
@@ -1268,7 +1354,18 @@ func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
     var av := board[a.y][a.x]
     var bv := board[b.y][b.x]
     var cells := {}
-    if av == SPECIAL_BOMB and bv == SPECIAL_BOMB:
+    if av == SPECIAL_COLOR or bv == SPECIAL_COLOR:
+        var color_other := bv if av == SPECIAL_COLOR else av
+        if color_other == SPECIAL_COLOR:
+            for y in ROWS:
+                for x in COLS:
+                    cells[Vector2i(x, y)] = true
+        else:
+            for y in ROWS:
+                for x in COLS:
+                    if board[y][x] == color_other or _is_special(board[y][x]):
+                        cells[Vector2i(x, y)] = true
+    elif av == SPECIAL_BOMB and bv == SPECIAL_BOMB:
         for y in ROWS:
             for x in COLS:
                 cells[Vector2i(x, y)] = true
