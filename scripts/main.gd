@@ -43,6 +43,12 @@ var level_modifier := "NORMAL"
 var boss_kind := "none"
 var boss_max_hp := 0
 var chest_reward := 0
+var claimed_star_chests: Array = []
+var daily_day := ""
+var daily_kind := "matches"
+var daily_target := 20
+var daily_progress := 0
+var daily_claimed := false
 
 var dragging := false
 var drag_start := Vector2.ZERO
@@ -125,6 +131,7 @@ const GEMS_TEX := preload("res://assets/art/gems.svg")
 func _ready() -> void:
     randomize()
     _load_progress()
+    _refresh_daily_quest()
     screen_mode = "map"
     queue_redraw()
 
@@ -362,6 +369,7 @@ func _draw_campaign_map() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(42, 86), "اختر طريقك • افتح الصناديق • اهزم الزعماء", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("d8c39d"))
     draw_string(ThemeDB.fallback_font, Vector2(525, 48), "★ %d" % stars, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("ffd45b"))
     draw_string(ThemeDB.fallback_font, Vector2(525, 80), "◆ %d" % coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffe5a1"))
+    draw_string(ThemeDB.fallback_font, Vector2(42, 104), _daily_quest_text(), HORIZONTAL_ALIGNMENT_LEFT, 620, 15, Color("9fe8c0") if not daily_claimed else Color("ffe17a"))
     var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
     var links := [[0,1],[1,2],[2,3],[2,4],[3,5],[4,5],[5,6],[5,7],[6,8],[7,8],[8,9]]
     for link in links:
@@ -391,6 +399,7 @@ func _draw_campaign_map() -> void:
     draw_string(ThemeDB.fallback_font,Vector2(85,1177),"مطرقة %d   انفجار %d   +5 حركات %d" % [ability_hammer,ability_blast,ability_extra_moves],HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color.WHITE)
     draw_string(ThemeDB.fallback_font,Vector2(410,1145),"المراحل المفتوحة: %d/10" % unlocked_levels.size(),HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("d7c29a"))
     draw_string(ThemeDB.fallback_font,Vector2(410,1177),"اختر مرحلة للبدء",HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("fff0bd"))
+    draw_string(ThemeDB.fallback_font,Vector2(85,1210),"مسار النجوم: %d/25  •  صناديق النجوم: %d" % [stars, claimed_star_chests.size()],HORIZONTAL_ALIGNMENT_LEFT,-1,15,Color("ffd45b"))
 
 func _handle_map_tap(pos: Vector2) -> void:
     var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
@@ -428,6 +437,48 @@ func _handle_end_tap(pos: Vector2) -> void:
         screen_mode = "map"
         queue_redraw()
 
+func _refresh_daily_quest() -> void:
+    var today := Time.get_date_string_from_system()
+    if daily_day == today:
+        return
+    daily_day = today
+    var day_number := int(today.replace("-", ""))
+    var variants := ["matches", "combo", "special"]
+    daily_kind = variants[day_number % variants.size()]
+    daily_target = 20 if daily_kind == "matches" else (4 if daily_kind == "combo" else 3)
+    daily_progress = 0
+    daily_claimed = false
+    _save_progress()
+
+func _daily_quest_text() -> String:
+    _refresh_daily_quest()
+    if daily_claimed:
+        return "مهمة اليوم ✓ مكتملة • مكافأة +50 ◆"
+    var label := "طابق القطع" if daily_kind == "matches" else ("حقق COMBO x4" if daily_kind == "combo" else "أنشئ Boosters")
+    return "مهمة اليوم: %s  %d/%d  •  المكافأة 50 ◆" % [label, daily_progress, daily_target]
+
+func _update_daily_quest(kind: String, amount: int = 1) -> void:
+    _refresh_daily_quest()
+    if daily_claimed or kind != daily_kind:
+        return
+    daily_progress = mini(daily_target, daily_progress + amount)
+    if daily_progress >= daily_target:
+        daily_claimed = true
+        coins += 50
+        message = "مهمة اليوم مكتملة! +50 ◆"
+        _save_progress()
+
+func _check_star_chest_rewards() -> void:
+    var milestones := [5, 10, 15, 20, 25]
+    for milestone in milestones:
+        if stars >= milestone and milestone not in claimed_star_chests:
+            claimed_star_chests.append(milestone)
+            coins += 50 + milestone * 5
+            ability_hammer += 1
+            if milestone >= 10:
+                ability_extra_moves += 1
+            message = "صندوق النجوم %d! +◆ وقدرة" % milestone
+
 func _save_progress() -> void:
     var cfg := ConfigFile.new()
     cfg.set_value("campaign", "unlocked_level", unlocked_level)
@@ -440,6 +491,12 @@ func _save_progress() -> void:
     cfg.set_value("abilities", "blast", ability_blast)
     cfg.set_value("abilities", "extra_moves", ability_extra_moves)
     cfg.set_value("rewards", "chests_opened", chests_opened)
+    cfg.set_value("rewards", "claimed_star_chests", claimed_star_chests)
+    cfg.set_value("daily", "day", daily_day)
+    cfg.set_value("daily", "kind", daily_kind)
+    cfg.set_value("daily", "target", daily_target)
+    cfg.set_value("daily", "progress", daily_progress)
+    cfg.set_value("daily", "claimed", daily_claimed)
     cfg.save("user://puzzle_heroes.cfg")
 
 func _load_progress() -> void:
@@ -455,6 +512,12 @@ func _load_progress() -> void:
         ability_blast = int(cfg.get_value("abilities", "blast", 1))
         ability_extra_moves = int(cfg.get_value("abilities", "extra_moves", 1))
         chests_opened = int(cfg.get_value("rewards", "chests_opened", 0))
+        claimed_star_chests = cfg.get_value("rewards", "claimed_star_chests", [])
+        daily_day = str(cfg.get_value("daily", "day", ""))
+        daily_kind = str(cfg.get_value("daily", "kind", "matches"))
+        daily_target = int(cfg.get_value("daily", "target", 20))
+        daily_progress = int(cfg.get_value("daily", "progress", 0))
+        daily_claimed = bool(cfg.get_value("daily", "claimed", false))
     if unlocked_levels.is_empty():
         unlocked_levels = [1]
     if level_stars.size() < 11:
@@ -846,6 +909,9 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             screen_shake = maxf(screen_shake, 0.35)
             camera_zoom = 1.035
         score += points
+        _update_daily_quest("matches", matches.size())
+        if combo >= 4:
+            _update_daily_quest("combo", 1)
         level_coins += maxi(1, matches.size() / 3)
 
         if goal_kind == "collect":
@@ -861,6 +927,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             special_value = SPECIAL_H if not _vertical_match_at(matches, special_cell) else SPECIAL_V
         if special_value >= 0 and goal_kind == "special":
             goal_progress = mini(goal_target, goal_progress + 1)
+            _update_daily_quest("special", 1)
 
         message = ("FEVER!  " if fever > 0.0 else "") + "COMBO x%d  +%d" % [combo, points]
         _prime_match_animation(matches)
@@ -1283,6 +1350,7 @@ func _complete_level() -> void:
         ability_hammer += 1
         ability_blast += 1
     coins += level_coins + chest_reward
+    _check_star_chest_rewards()
     best_score = maxi(best_score, score)
     _unlock_after_level(level_number)
     unlocked_level = maxi(unlocked_level, level_number + 1)
