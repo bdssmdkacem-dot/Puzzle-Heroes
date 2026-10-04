@@ -58,6 +58,7 @@ const SNAKE_TEX := preload("res://assets/art/snake.svg")
 const ROCK_TEX := preload("res://assets/art/rock.svg")
 const CAPTIVE_TEX := preload("res://assets/art/captive.svg")
 const SCENE_TEX := preload("res://assets/art/scene.svg")
+const GEMS_TEX := preload("res://assets/art/gems.svg")
 
 func _ready() -> void:
     randomize()
@@ -131,9 +132,8 @@ func _draw_top_hud() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(637, 51), str(moves), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("fff1bd"))
 
 func _draw_rescue_scene() -> void:
-    # Stone chamber.
-    draw_rect(Rect2(18, 108, 684, 548), Color("7d5a35"))
-    draw_rect(Rect2(28, 118, 664, 528), Color("34281e"))
+    # Premium illustrated rescue chamber asset.
+    draw_texture_rect(SCENE_TEX, Rect2(18, 108, 684, 548), false)
     # Wall bands and floor.
     for y in range(125, 470, 52):
         for x in range(34, 690, 82):
@@ -185,24 +185,11 @@ func _draw_rescue_scene() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(280, 148), objective, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("ffe6a1"))
 
 func _draw_large_snake(pos: Vector2) -> void:
-    var hit := snake_hit_flash
-    var body := Color("74b72d") if hit <= 0.0 else Color("d9df45")
-    draw_circle(pos + Vector2(-145, -4), 58, body)
-    draw_circle(pos + Vector2(-102, 5), 55, body)
-    draw_circle(pos + Vector2(-58, 15), 52, body)
-    draw_circle(pos + Vector2(-14, 27), 49, body)
-    draw_circle(pos + Vector2(32, 37), 46, body)
-    draw_circle(pos + Vector2(77, 48), 44, body)
-    draw_circle(pos + Vector2(120, 60), 42, body)
-    draw_circle(pos + Vector2(157, 62), 50, body)
-    for p in [pos + Vector2(-145,-4),pos + Vector2(-102,5),pos + Vector2(-58,15),pos + Vector2(-14,27),pos + Vector2(32,37),pos + Vector2(77,48),pos + Vector2(120,60)]:
-        draw_circle(p + Vector2(-12,-12), 14, Color(1,1,1,0.18))
-        draw_circle(p, 46, Color("3c7620"), false, 4)
-    var head := pos + Vector2(175, 62)
-    draw_circle(head, 58, body)
-    draw_circle(head + Vector2(17,-10), 8, Color("fff0b0"))
-    draw_circle(head + Vector2(19,-10), 3, Color("21180f"))
-    draw_line(head + Vector2(38,14), head + Vector2(57,18), Color("b62e2e"), 4)
+    var scale := 0.72 + snake_hit_flash * 0.04
+    var size := Vector2(600, 300) * scale
+    draw_texture_rect(SNAKE_TEX, Rect2(pos - size * 0.5, size), false)
+    if snake_hit_flash > 0.0:
+        draw_circle(pos + Vector2(160, 45), 58, Color(1, 0.9, 0.2, snake_hit_flash * 0.28))
 
 func _draw_board() -> void:
     draw_rect(Rect2(24, 666, 672, 580), Color("b98628"))
@@ -220,14 +207,8 @@ func _draw_board() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(50, 1271), message, HORIZONTAL_ALIGNMENT_LEFT, 620, 16, Color.WHITE)
 
 func _draw_gem(center: Vector2, value: int) -> void:
-    var base := COLORS[value]
-    draw_circle(center + Vector2(2, 4), 31, Color(0,0,0,0.20))
-    draw_circle(center, 29, base)
-    draw_circle(center, 25, base.lightened(0.08))
-    draw_circle(center + Vector2(-9,-10), 8, Color(1,1,1,0.30))
-    draw_circle(center, 30, Color("4a392c"), false, 2)
-    draw_string(ThemeDB.fallback_font, center + Vector2(-12, 10), TILE_SYMBOLS[value],
-        HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color(1,1,1,0.82))
+    var src := Rect2(value * 150, 0, 150, 150)
+    draw_texture_rect_region(GEMS_TEX, Rect2(center - Vector2(36, 36), Vector2(72, 72)), src)
 
 func _cell_box() -> StyleBoxFlat:
     var box := StyleBoxFlat.new()
