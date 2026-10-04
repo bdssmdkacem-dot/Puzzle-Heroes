@@ -417,34 +417,46 @@ func _draw_end_panel() -> void:
         draw_string(ThemeDB.fallback_font, Vector2(260, 696), "RÉESSAYER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
 
 func _handle_end_tap(pos: Vector2) -> void:
-    if pos.x < 145 or pos.x > 575 or pos.y < 630 or pos.y > 735:
+    if pos.x < 110 or pos.x > 610 or pos.y < 620 or pos.y > 745:
         return
     if level_lost:
         _new_level()
         return
     if level_won:
-        if level_number < unlocked_level and level_number < 10:
-            level_number += 1
-            _new_level()
-        else:
-            level_number = 1
-            _new_level()
+        screen_mode = "map"
+        queue_redraw()
 
 func _save_progress() -> void:
     var cfg := ConfigFile.new()
     cfg.set_value("campaign", "unlocked_level", unlocked_level)
+    cfg.set_value("campaign", "unlocked_levels", unlocked_levels)
+    cfg.set_value("campaign", "level_stars", level_stars)
     cfg.set_value("campaign", "stars", stars)
     cfg.set_value("campaign", "coins", coins)
     cfg.set_value("campaign", "best_score", best_score)
+    cfg.set_value("abilities", "hammer", ability_hammer)
+    cfg.set_value("abilities", "blast", ability_blast)
+    cfg.set_value("abilities", "extra_moves", ability_extra_moves)
+    cfg.set_value("rewards", "chests_opened", chests_opened)
     cfg.save("user://puzzle_heroes.cfg")
 
 func _load_progress() -> void:
     var cfg := ConfigFile.new()
     if cfg.load("user://puzzle_heroes.cfg") == OK:
         unlocked_level = int(cfg.get_value("campaign", "unlocked_level", 1))
+        unlocked_levels = cfg.get_value("campaign", "unlocked_levels", [1])
+        level_stars = cfg.get_value("campaign", "level_stars", [0,0,0,0,0,0,0,0,0,0,0])
         stars = int(cfg.get_value("campaign", "stars", 0))
         coins = int(cfg.get_value("campaign", "coins", 0))
         best_score = int(cfg.get_value("campaign", "best_score", 0))
+        ability_hammer = int(cfg.get_value("abilities", "hammer", 2))
+        ability_blast = int(cfg.get_value("abilities", "blast", 1))
+        ability_extra_moves = int(cfg.get_value("abilities", "extra_moves", 1))
+        chests_opened = int(cfg.get_value("rewards", "chests_opened", 0))
+    if unlocked_levels.is_empty():
+        unlocked_levels = [1]
+    if level_stars.size() < 11:
+        level_stars.resize(11)
 
 func _draw_top_hud() -> void:
     draw_rect(Rect2(0, 0, 720, 92), Color("2a211b"))
@@ -457,6 +469,10 @@ func _draw_top_hud() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(450, 78), "◆ %d" % coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe17a"))
     draw_rect(Rect2(625, 23, 65, 42), Color("49372a"))
     draw_string(ThemeDB.fallback_font, Vector2(637, 51), str(moves), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("fff1bd"))
+    draw_rect(Rect2(245, 14, 115, 65), Color("49372a"))
+    draw_string(ThemeDB.fallback_font, Vector2(255, 37), "مطرقة %d" % ability_hammer, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("ffe7aa"))
+    draw_string(ThemeDB.fallback_font, Vector2(255, 58), "انفجار %d" % ability_blast, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("ffe7aa"))
+    draw_string(ThemeDB.fallback_font, Vector2(375, 48), "+5 حركات %d" % ability_extra_moves, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("ffe7aa"))
 
 func _draw_rescue_scene() -> void:
     # Premium illustrated rescue chamber asset.
@@ -623,6 +639,12 @@ func _cell_box() -> StyleBoxFlat:
     return box
 
 func _input(event: InputEvent) -> void:
+    if screen_mode == "map":
+        if event is InputEventScreenTouch and event.pressed:
+            _handle_map_tap(_input_to_design(event.position))
+        elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+            _handle_map_tap(event.position)
+        return
     if level_won or level_lost:
         if event is InputEventScreenTouch and event.pressed:
             _handle_end_tap(_input_to_design(event.position))
@@ -631,6 +653,13 @@ func _input(event: InputEvent) -> void:
         return
     if busy:
         return
+
+    if event is InputEventScreenTouch and event.pressed:
+        if _handle_ability_tap(_input_to_design(event.position)):
+            return
+    elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+        if _handle_ability_tap(event.position):
+            return
 
     # Android / iOS touch. Normalize to the 720x1280 design space.
     if event is InputEventScreenTouch:
@@ -668,6 +697,44 @@ func _input(event: InputEvent) -> void:
         var mouse_delta: Vector2 = event.position - drag_start
         if mouse_delta.length() >= 34.0:
             _finish_drag(event.position)
+
+func _handle_ability_tap(pos: Vector2) -> bool:
+    if pos.y < 12.0 or pos.y > 82.0:
+        return false
+    if pos.x >= 245.0 and pos.x <= 360.0 and pos.y < 48.0 and ability_hammer > 0 and obstacle_index < obstacle_hp.size():
+        ability_hammer -= 1
+        obstacle_hp[obstacle_index] = max(0, obstacle_hp[obstacle_index] - 2)
+        score += 30
+        message = "مطرقة البطل! ضربة قوية."
+        obstacle_flash = 1.0
+        rock_impact = 1.0
+        screen_shake = 0.45
+        if obstacle_hp[obstacle_index] == 0:
+            obstacle_index += 1
+            hero_progress += 1
+            if hero_progress >= PATH_POINTS.size() - 1:
+                _begin_boss_or_finish()
+        _save_progress()
+        return true
+    if pos.x >= 245.0 and pos.x <= 360.0 and pos.y >= 48.0 and ability_blast > 0:
+        ability_blast -= 1
+        for y in ROWS:
+            for x in COLS:
+                if board[y][x] == goal_color:
+                    board[y][x] = -1
+        _collapse()
+        score += 60
+        message = "انفجار اللون! الساحة تنهار."
+        screen_shake = 0.55
+        _save_progress()
+        return true
+    if pos.x >= 365.0 and pos.x <= 500.0 and pos.y >= 12.0 and ability_extra_moves > 0:
+        ability_extra_moves -= 1
+        moves += 5
+        message = "+5 حركات! أكمل السلسلة."
+        _save_progress()
+        return true
+    return false
 
 func _finish_drag(pos: Vector2) -> void:
     dragging = false
