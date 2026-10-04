@@ -489,6 +489,54 @@ func _update_combat_sprite_layer(delta: float) -> void:
     else:
         boss_sprite.play(&"idle")
 
+func _update_boss_combat(delta: float) -> void:
+    if not combat_active or level_won:
+        boss_phase = "idle"
+        boss_phase_t = 0.0
+        return
+    boss_phase_t += delta
+    boss_attack_cooldown = maxf(0.0, boss_attack_cooldown - delta)
+    if boss_phase == "idle":
+        if boss_attack_cooldown <= 0.0 and boss_intro <= 0.0:
+            _start_boss_attack()
+    elif boss_phase == "windup":
+        if boss_phase_t >= 0.46:
+            boss_phase = "impact"
+            boss_phase_t = 0.0
+            _execute_boss_attack()
+    elif boss_phase == "impact":
+        if boss_phase_t >= 0.18:
+            boss_phase = "recovery"
+            boss_phase_t = 0.0
+    elif boss_phase == "recovery":
+        if boss_phase_t >= 0.42:
+            boss_phase = "idle"
+            boss_phase_t = 0.0
+            boss_attack_cooldown = 0.55
+
+func _start_boss_attack() -> void:
+    boss_phase = "windup"
+    boss_phase_t = 0.0
+    boss_attack_id = boss_turn % 3
+    boss_turn += 1
+    _play_sfx("boss", 0.8)
+
+func _execute_boss_attack() -> void:
+    _play_sfx("hit", 1.0)
+    _emit_combat_particles(false, 28)
+    _spawn_attack_effects(3 + boss_attack_id * 2)
+    screen_shake = maxf(screen_shake, 0.20)
+    match boss_kind:
+        "snake":
+            snake_poison_sequence = 0.75
+        "guardian":
+            guardian_shield = boss_attack_id == 0
+        "beast":
+            beast_rage_sequence = 0.75
+        "dragon":
+            dragon_breath_sequence = 0.95
+            dragon_breath_variant = boss_attack_id
+
 func _new_level() -> void:
     board.clear()
     tile_offset.clear()
