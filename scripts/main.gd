@@ -184,6 +184,7 @@ var combat_layer: Node2D
 var sprite_anim_state := "idle"
 var boss_ai_timer := 0.0
 var boss_ai_pattern := 0
+var combat_boss_kind := ""
 
 func _ready() -> void:
     randomize()
@@ -337,14 +338,16 @@ func _update_combat_sprite_layer(delta: float) -> void:
         return
     hero_sprite.visible = true
     boss_sprite.visible = combat_active and not level_won
-    if boss_kind == "guardian":
-        boss_sprite.sprite_frames = _make_sprite_frames(GUARDIAN_PRO_TEX)
-    elif boss_kind == "beast":
-        boss_sprite.sprite_frames = _make_sprite_frames(BEAST_PRO_TEX)
-    elif boss_kind == "dragon":
-        boss_sprite.sprite_frames = _make_sprite_frames(DRAGON_PRO_TEX)
-    else:
-        boss_sprite.sprite_frames = _make_sprite_frames(SNAKE_PRO_TEX)
+    if boss_kind != combat_boss_kind:
+        if boss_kind == "guardian":
+            boss_sprite.sprite_frames = _make_sprite_frames(GUARDIAN_PRO_TEX)
+        elif boss_kind == "beast":
+            boss_sprite.sprite_frames = _make_sprite_frames(BEAST_PRO_TEX)
+        elif boss_kind == "dragon":
+            boss_sprite.sprite_frames = _make_sprite_frames(DRAGON_PRO_TEX)
+        else:
+            boss_sprite.sprite_frames = _make_sprite_frames(SNAKE_PRO_TEX)
+        combat_boss_kind = boss_kind
     if boss_phase == "windup":
         boss_sprite.scale = Vector2.ONE * (0.82 + sin(boss_phase_t * 14.0) * 0.045)
     elif boss_phase == "impact":
@@ -494,6 +497,7 @@ func _new_level() -> void:
     boss_enraged = false
     boss_phase = "idle"
     boss_phase_t = 0.0
+    combat_boss_kind = ""
     boss_attack_id = 0
     boss_attack_cooldown = 0.0
     guardian_shield = false
