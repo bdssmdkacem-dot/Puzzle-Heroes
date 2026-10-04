@@ -33,6 +33,9 @@ var combo := 0
 var best_score := 0
 var campaign_complete := false
 var screen_mode := "map"
+var story_step := 0
+var story_level := 0
+var story_choice := 0
 var unlocked_levels: Array = [1]
 var level_stars: Array = [0,0,0,0,0,0,0,0,0,0,0]
 var ability_hammer := 2
@@ -301,6 +304,9 @@ func _draw() -> void:
     if screen_mode == "map":
         _draw_campaign_map()
         return
+    if screen_mode == "story":
+        _draw_story_screen()
+        return
     var impact := sin((1.0 - screen_shake) * PI) if screen_shake > 0.0 else 0.0
     camera_kick = Vector2(sin(hero_anim_phase * 17.0), cos(hero_anim_phase * 13.0)) * screen_shake * 7.0
     draw_set_transform(camera_kick, 0.0, Vector2.ONE * camera_zoom)
@@ -420,8 +426,120 @@ func _start_level(selected_level: int) -> void:
     if not _is_level_unlocked(selected_level):
         return
     level_number = selected_level
+    if selected_level in [3, 6, 9, 10]:
+        story_level = selected_level
+        story_step = 0
+        story_choice = 0
+        screen_mode = "story"
+        queue_redraw()
+        return
     screen_mode = "level"
     _new_level()
+
+func _start_story_level() -> void:
+    screen_mode = "level"
+    _new_level()
+    queue_redraw()
+
+func _handle_story_tap(pos: Vector2) -> void:
+    if story_step == 0:
+        if pos.y >= 860 and pos.y <= 970:
+            story_choice = 1
+            story_step = 1
+            queue_redraw()
+        elif pos.y >= 990 and pos.y <= 1100:
+            story_choice = 2
+            story_step = 1
+            queue_redraw()
+    else:
+        if pos.y >= 1000 and pos.y <= 1160:
+            _start_story_level()
+
+func _story_character_name() -> String:
+    match story_level:
+        3:
+            return "البطل • الأفعى"
+        6:
+            return "البطل • الحارس"
+        9:
+            return "البطل • الوحش"
+        10:
+            return "البطل • التنين"
+        _:
+            return "الأبطال"
+
+func _story_title() -> String:
+    match story_level:
+        3:
+            return "بوابة وادي الأطلال"
+        6:
+            return "حارس قمم الجليد"
+        9:
+            return "قلب غابة الأنياب"
+        10:
+            return "المواجهة الأخيرة"
+        _:
+            return world_name(story_level)
+
+func _story_body() -> String:
+    match story_level:
+        3:
+            return "وصل الأبطال إلى قلب الأطلال. الأفعى تحرس الطريق، لكن خلفها بوابة إلى قمم الجليد."
+        6:
+            return "الحارس أغلق الممر الجليدي. لا يمكن العبور إلا بكسر درعه وإثبات قوة الأبطال."
+        9:
+            return "في أعماق الغابة ينتظر الوحش. القرار الآن: اندفع بسرعة، أو حضّر أقوى Boosters قبل المواجهة."
+        10:
+            return "وصل الأبطال إلى قلعة التنين. هذه المعركة ستحدد مصير المملكة."
+        _:
+            return ""
+
+func _story_choice_text() -> String:
+    if story_choice == 1:
+        return "سنهاجم الآن!"
+    if story_choice == 2:
+        return "سنجهز أنفسنا أولاً."
+    return "اختر قرارك"
+
+func _draw_story_screen() -> void:
+    var wid := world_id(story_level)
+    var bg := Color("24180f")
+    var accent := Color("e9b62f")
+    match wid:
+        2:
+            bg = Color("132b38")
+            accent = Color("72d8ff")
+        3:
+            bg = Color("142b1a")
+            accent = Color("7bdc68")
+        4:
+            bg = Color("2c1232")
+            accent = Color("c77cff")
+    draw_rect(Rect2(0, 0, 720, 1280), bg)
+    draw_rect(Rect2(24, 24, 672, 1232), accent, false, 5)
+    draw_string(ThemeDB.fallback_font, Vector2(48, 82), world_name(story_level), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, accent)
+    draw_string(ThemeDB.fallback_font, Vector2(48, 145), _story_title(), HORIZONTAL_ALIGNMENT_LEFT, 620, 34, Color("fff0bd"))
+    # Character presentation card; the existing character art is reused at large scale.
+    if story_level == 3:
+        draw_texture_rect(SNAKE_TEX, Rect2(330, 210, 330, 220), false)
+        draw_texture_rect(HERO_TEX, Rect2(55, 220, 220, 300), false)
+    else:
+        draw_texture_rect(HERO_TEX, Rect2(55, 220, 250, 320), false)
+        draw_texture_rect(SNAKE_TEX, Rect2(350, 210, 300, 230), false)
+    draw_rect(Rect2(55, 565, 610, 260), Color(0.04,0.03,0.025,0.94))
+    draw_string(ThemeDB.fallback_font, Vector2(80, 615), _story_character_name(), HORIZONTAL_ALIGNMENT_LEFT, 550, 22, Color("ffe17a"))
+    draw_string(ThemeDB.fallback_font, Vector2(80, 670), _story_body(), HORIZONTAL_ALIGNMENT_LEFT, 550, 19, Color("f3ead8"))
+    if story_step == 0:
+        draw_rect(Rect2(55, 860, 610, 92), Color("8e5424"))
+        draw_string(ThemeDB.fallback_font, Vector2(110, 918), "⚔  نهاجم الآن", HORIZONTAL_ALIGNMENT_LEFT, 500, 23, Color.WHITE)
+        draw_rect(Rect2(55, 990, 610, 92), Color("3f5e42"))
+        draw_string(ThemeDB.fallback_font, Vector2(110, 1048), "◆  نحضّر الـBoosters", HORIZONTAL_ALIGNMENT_LEFT, 500, 23, Color.WHITE)
+    else:
+        draw_string(ThemeDB.fallback_font, Vector2(85, 890), _story_choice_text(), HORIZONTAL_ALIGNMENT_LEFT, 540, 25, accent)
+        draw_string(ThemeDB.fallback_font, Vector2(85, 950), "القرار اتخذ. المعركة تبدأ الآن.", HORIZONTAL_ALIGNMENT_LEFT, 540, 20, Color("e8dcc8"))
+        draw_rect(Rect2(90, 1010, 540, 100), accent)
+        draw_string(ThemeDB.fallback_font, Vector2(235, 1073), "ابدأ المعركة", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color("21150f"))
+    draw_string(ThemeDB.fallback_font, Vector2(48, 1215), "قرارك يغيّر العرض والرسالة — وليس صعوبة المستوى.", HORIZONTAL_ALIGNMENT_LEFT, 620, 15, Color("cbbda8"))
 
 func _is_level_unlocked(value: int) -> bool:
     return value in unlocked_levels
@@ -875,6 +993,12 @@ func _cell_box() -> StyleBoxFlat:
     return box
 
 func _input(event: InputEvent) -> void:
+    if screen_mode == "story":
+        if event is InputEventScreenTouch and event.pressed:
+            _handle_story_tap(_input_to_design(event.position))
+        elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+            _handle_story_tap(event.position)
+        return
     if screen_mode == "map":
         if event is InputEventScreenTouch and event.pressed:
             _handle_map_tap(_input_to_design(event.position))
