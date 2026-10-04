@@ -266,6 +266,10 @@ func _new_level() -> void:
     streak_best = 0
     near_miss_flash = 0.0
     combo_flash = 0.0
+    star_reveal = 0.0
+    reward_pop = 0.0
+    boss_intro = 0.0
+    result_timer = 0.0
     obstacle_hp.clear()
     for hp in OBSTACLE_MAX_HP:
         obstacle_hp.append(hp)
@@ -1076,6 +1080,8 @@ func _input(event: InputEvent) -> void:
             _handle_end_tap(event.position)
         return
     if busy:
+        return
+    if boss_intro > 0.0:
         return
 
     if event is InputEventScreenTouch and event.pressed:
