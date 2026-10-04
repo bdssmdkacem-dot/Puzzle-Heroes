@@ -198,13 +198,16 @@ var sfx_cursor := 0
 
 func _ready() -> void:
     randomize()
-    # Combat rendering is initialized lazily when a level opens.
-    _load_progress()
-    _refresh_daily_quest()
+    # Boot must be completely deterministic: no filesystem, time, audio, combat or art work here.
     screen_mode = "map"
+    set_process(true)
     queue_redraw()
 
 func _process(delta: float) -> void:
+    # The campaign map is a safe boot state. Keep the heavy gameplay update loop disabled until a level is entered.
+    if screen_mode == "map":
+        queue_redraw()
+        return
     audio_time += delta
     hero_bounce += delta * 5.0
     art_idle_phase += delta * 4.0
