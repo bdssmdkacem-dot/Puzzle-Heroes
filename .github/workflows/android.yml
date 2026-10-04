@@ -31,6 +31,7 @@ jobs:
           unzip -q templates.tpz -d templates
           cp templates/templates/android_debug.apk "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
           cp templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.3.stable/android_release.apk"
+          echo "4.3.stable" > "$HOME/.local/share/godot/export_templates/4.3.stable/version.txt"
 
       - name: Validate project
         run: |
