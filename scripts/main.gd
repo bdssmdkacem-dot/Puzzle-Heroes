@@ -70,6 +70,12 @@ var effects: Array = []
 var refill_anim := 1.0
 var hero_attack := 0.0
 var screen_shake := 0.0
+var camera_zoom := 1.0
+var camera_focus := Vector2(360, 640)
+var camera_kick := Vector2.ZERO
+var hero_anim_phase := 0.0
+var snake_boss_phase := 0.0
+var boss_pulse := 0.0
 var cascade := 0
 var combo_flash := 0.0
 
@@ -109,6 +115,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
     hero_bounce += delta * 5.0
+    hero_anim_phase += delta * 7.0
+    snake_boss_phase += delta * (2.2 if combat_active else 1.1)
+    boss_pulse = maxf(0.0, boss_pulse - delta * 2.2)
     snake_alert = maxf(0.0, snake_alert - delta * 2.5)
     obstacle_flash = maxf(0.0, obstacle_flash - delta * 3.5)
     attack_flash = maxf(0.0, attack_flash - delta * 4.0)
@@ -122,6 +131,8 @@ func _process(delta: float) -> void:
     refill_anim = minf(1.0, refill_anim + delta * 3.8)
     hero_attack = maxf(0.0, hero_attack - delta * 3.8)
     screen_shake = maxf(0.0, screen_shake - delta * 4.0)
+    camera_zoom = lerpf(camera_zoom, 1.0, minf(1.0, delta * 7.0))
+    camera_kick = camera_kick.lerp(Vector2.ZERO, minf(1.0, delta * 9.0))
     combo_flash = maxf(0.0, combo_flash - delta * 2.8)
     _update_tile_animations(delta)
     _update_booster_paths(delta)
@@ -201,8 +212,12 @@ func _new_level() -> void:
 func _draw() -> void:
     # Full-screen portrait adventure layout inspired by premium mobile puzzle games.
     draw_rect(Rect2(0, 0, 720, 1280), Color("17120f"))
+    var impact := sin((1.0 - screen_shake) * PI) if screen_shake > 0.0 else 0.0
+    camera_kick = Vector2(sin(hero_anim_phase * 17.0), cos(hero_anim_phase * 13.0)) * screen_shake * 7.0
+    draw_set_transform(camera_kick, 0.0, Vector2.ONE * camera_zoom)
     _draw_top_hud()
     _draw_rescue_scene()
+    draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
     _draw_board()
     _draw_tile_trails()
     _draw_vfx_rings()
@@ -346,7 +361,9 @@ func _draw_rescue_scene() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(280, 148), objective, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("ffe6a1"))
 
 func _draw_hero(pos: Vector2) -> void:
-    var bob := sin(hero_bounce) * 3.0
+    var bob := sin(hero_bounce) * 3.0 + sin(hero_anim_phase * 1.7) * 2.0
+    if combat_active:
+        bob += sin(hero_anim_phase * 2.8) * 3.0
     var strike := sin((1.0 - hero_strike) * PI) if hero_strike > 0.0 else 0.0
     var recoil := hero_attack * -18.0 + strike * 28.0
     var size := Vector2(126, 160) * (1.0 + strike * 0.035)
@@ -359,12 +376,18 @@ func _draw_hero(pos: Vector2) -> void:
 
 func _draw_large_snake(pos: Vector2) -> void:
     var hit := sin((1.0 - snake_hit_flash) * PI) if snake_hit_flash > 0.0 else 0.0
+    var boss_bob := sin(snake_boss_phase) * (5.0 if combat_active else 2.0)
+    var boss_pulse_scale := 1.0 + (0.025 + 0.02 * sin(snake_boss_phase * 2.0)) if combat_active else 1.0
     var shake := sin(hero_bounce * 34.0) * snake_shake * 9.0
     var recoil := -snake_recoil * 28.0
     var scale := 0.72 + hit * 0.035
     var size := Vector2(600, 300) * scale
-    var p := pos + Vector2(recoil + shake, 0)
+    var p := pos + Vector2(recoil + shake, boss_bob)
+    size *= boss_pulse_scale
     draw_texture_rect(SNAKE_TEX, Rect2(p - size * 0.5, size), false)
+    if combat_active:
+        draw_arc(p + Vector2(145, 35), 188.0 + sin(snake_boss_phase * 2.0) * 8.0, PI * 0.15, PI * 0.85, 28, Color(1.0, 0.32, 0.16, 0.22), 8.0)
+        draw_string(ThemeDB.fallback_font, p + Vector2(-155, -120), "BOSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1.0, 0.46, 0.28, 0.88))
     if snake_hit_flash > 0.0:
         draw_circle(p + Vector2(160, 45), 58.0 + hit * 12.0, Color(1, 0.9, 0.2, snake_hit_flash * 0.28))
         draw_arc(p + Vector2(160, 45), 72.0 + hit * 16.0, 0, TAU, 28, Color(1, 0.55, 0.2, snake_hit_flash * 0.75), 8.0)
@@ -636,6 +659,8 @@ func _apply_adventure_damage(match_count: int) -> void:
     attack_flash = 1.0
     snake_alert = 1.0
     hero_strike = 1.0
+    screen_shake = maxf(screen_shake, 0.42)
+    camera_zoom = 1.025
     _spawn_rock_impact(obstacle_index)
 
     if obstacle_hp[obstacle_index] > 0:
@@ -679,6 +704,9 @@ func _apply_snake_damage(match_count: int) -> void:
     snake_recoil = 1.0
     snake_shake = 1.0
     hero_strike = 1.0
+    screen_shake = maxf(screen_shake, 0.62)
+    camera_zoom = 1.045
+    boss_pulse = 1.0
     snake_hit_flash = 1.0
     snake_alert = 1.0
     score += damage * 25
@@ -706,6 +734,8 @@ func _apply_snake_damage(match_count: int) -> void:
     _save_progress()
     message = "SAUVETAGE RÉUSSI ! +%d ★  +%d ◆" % [earned_stars, level_coins + earned_stars * 5]
     rescue_celebration = 1.0
+    screen_shake = 0.25
+    camera_zoom = 1.035
     _spawn_rescue_celebration()
     var rescue_tween := create_tween()
     rescue_tween.set_parallel(true)
