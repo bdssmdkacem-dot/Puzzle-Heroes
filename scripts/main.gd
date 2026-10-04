@@ -692,26 +692,30 @@ func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
         var color := board[other.y][other.x]
         for y in ROWS:
             for x in COLS:
-                if board[y][x] == color:
+                if board[y][x] == color or _is_special(board[y][x]):
                     cells[Vector2i(x, y)] = true
+        for y in ROWS:
+            for x in COLS:
+                if board[y][x] == SPECIAL_H or board[y][x] == SPECIAL_V:
+                    for xx in COLS:
+                        cells[Vector2i(xx, y)] = true
+                    for yy in ROWS:
+                        cells[Vector2i(x, yy)] = true
     else:
-        var first := a
-        if av != SPECIAL_H and av != SPECIAL_V:
-            first = b
+        var first := a if _is_special(av) else b
+        var second := b if first == a else a
         var fv := board[first.y][first.x]
-        if fv == SPECIAL_H:
+        var sv := board[second.y][second.x]
+        if (fv == SPECIAL_H and sv == SPECIAL_V) or (fv == SPECIAL_V and sv == SPECIAL_H):
             for x in COLS:
                 cells[Vector2i(x, first.y)] = true
-        else:
             for y in ROWS:
                 cells[Vector2i(first.x, y)] = true
-        var other_special := b if first == a else a
-        var ov := board[other_special.y][other_special.x]
-        if _is_special(ov):
+        else:
             for x in COLS:
-                cells[Vector2i(x, other_special.y)] = true
+                cells[Vector2i(x, first.y)] = true
             for y in ROWS:
-                cells[Vector2i(other_special.x, y)] = true
+                cells[Vector2i(first.x, y)] = true
     return Array(cells.keys())
 
 func _check_goal() -> void:
