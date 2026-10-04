@@ -207,7 +207,7 @@ func _draw_adventure_area() -> void:
     if combat_active and not level_won:
         draw_rect(Rect2(455, 266, 192, 45), Color(0.18, 0.08, 0.06, 0.88))
         draw_string(ThemeDB.fallback_font, Vector2(470, 286), "SERPENT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe6c0"))
-        for h in snake_hp:
+        for h in range(snake_hp):
             draw_rect(Rect2(470 + h * 27, 296, 21, 8), Color("e84d48"))
 
     # Contextual objective.
@@ -243,11 +243,10 @@ func _draw_obstacle(pos: Vector2, index: int) -> void:
     var shake := sin(obstacle_flash * 28.0 + float(index)) * 5.0 if obstacle_flash > 0.0 else 0.0
     var p := pos + Vector2(shake, 0)
     draw_texture_rect(ROCK_TEX, Rect2(p - Vector2(43, 43), Vector2(86, 86)), false)
-    for h in hp:
+    for h in range(hp):
         draw_circle(p + Vector2((h - 1) * 16.0 - 8.0, -53), 6, Color("ef4f48"))
 
 func _draw_hero(pos: Vector2) -> void:
-    var scale := Vector2(0.72, 0.72)
     draw_texture_rect(HERO_TEX, Rect2(pos - Vector2(43, 58), Vector2(86, 108)), false)
     if attack_flash > 0.0:
         draw_line(pos + Vector2(25, -4), pos + Vector2(68, -24), Color(1, 0.88, 0.35, attack_flash), 8)
