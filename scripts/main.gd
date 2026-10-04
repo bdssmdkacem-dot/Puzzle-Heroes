@@ -490,6 +490,11 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     refill_anim = 0.0
     hero_attack = 1.0
     _spawn_attack_effects(matches.size())
+    _apply_adventure_damage(matches.size())
+    _check_goal()
+    if moves <= 0 and not level_won:
+        level_lost = true
+        message = "Niveau échoué • touche pour réessayer"
     busy = false
     queue_redraw()
 
