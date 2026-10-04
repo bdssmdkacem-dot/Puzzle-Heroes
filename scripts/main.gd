@@ -63,6 +63,8 @@ var effects: Array = []
 var refill_anim := 1.0
 var hero_attack := 0.0
 var screen_shake := 0.0
+var cascade := 0
+var combo_flash := 0.0
 var goal_kind := "rocks"
 var goal_target := 4
 var goal_progress := 0
@@ -93,6 +95,7 @@ func _process(delta: float) -> void:
     refill_anim = minf(1.0, refill_anim + delta * 3.8)
     hero_attack = maxf(0.0, hero_attack - delta * 3.8)
     screen_shake = maxf(0.0, screen_shake - delta * 4.0)
+    combo_flash = maxf(0.0, combo_flash - delta * 2.8)
     _update_effects(delta)
     queue_redraw()
 
@@ -113,6 +116,8 @@ func _new_level() -> void:
     moves = 24 + level_number * 2
     level_coins = 0
     combo = 0
+    cascade = 0
+    combo_flash = 0.0
     obstacle_hp.clear()
     for hp in OBSTACLE_MAX_HP:
         obstacle_hp.append(hp)
