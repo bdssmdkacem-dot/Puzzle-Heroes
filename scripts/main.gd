@@ -204,9 +204,8 @@ func _ready() -> void:
     queue_redraw()
 
 func _process(delta: float) -> void:
-    # The campaign map is a safe boot state. Keep the heavy gameplay update loop disabled until a level is entered.
+    # Do not execute any runtime loop while the safe boot/map screen is active.
     if screen_mode == "map":
-        queue_redraw()
         return
     audio_time += delta
     hero_bounce += delta * 5.0
@@ -710,12 +709,10 @@ func _new_level() -> void:
     busy = false
 
 func _draw() -> void:
-    draw_rect(Rect2(0, 0, 720, 1280), Color("17120f"))
+    # ROOT BOOT DIAGNOSTIC: only primitive CanvasItem drawing on the first screen.
+    # No SVGs, particles, transforms, dynamic collections or gameplay code.
     if screen_mode == "map":
-        _draw_campaign_map()
-        return
-    if screen_mode == "story":
-        _draw_story_screen()
+        _draw_safe_boot()
         return
     var impact := sin((1.0 - screen_shake) * PI) if screen_shake > 0.0 else 0.0
     camera_kick = Vector2(sin(hero_anim_phase * 17.0), cos(hero_anim_phase * 13.0)) * screen_shake * 7.0
@@ -738,6 +735,38 @@ func _draw() -> void:
         draw_rect(Rect2(0, 0, 720, 1280), Color(0.03, 0.02, 0.02, screen_transition))
     if boss_intro > 0.0 and combat_active:
         _draw_boss_cinematic()
+
+func _draw_safe_boot() -> void:
+    draw_rect(Rect2(0, 0, 720, 1280), Color("16324a"), true)
+    draw_circle(Vector2(360, 245), 170.0, Color("2d6c8e"))
+    draw_colored_polygon(PackedVector2Array([
+        Vector2(0,560),Vector2(110,430),Vector2(220,540),Vector2(330,400),
+        Vector2(460,535),Vector2(590,420),Vector2(720,555),Vector2(720,1080),Vector2(0,1080)
+    ]), Color("4b944b"))
+    draw_colored_polygon(PackedVector2Array([
+        Vector2(0,700),Vector2(150,610),Vector2(285,690),Vector2(420,590),
+        Vector2(560,680),Vector2(720,600),Vector2(720,1080),Vector2(0,1080)
+    ]), Color("68b857"))
+    draw_rect(Rect2(26,26,668,112), Color("0b1825"), true)
+    draw_rect(Rect2(26,26,668,112), Color("e5ae36"), false, 3.0)
+    draw_string(ThemeDB.fallback_font, Vector2(0, 82), "PUZZLE HEROES", HORIZONTAL_ALIGNMENT_CENTER, 720, 38, Color("fff3bf"))
+    draw_string(ThemeDB.fallback_font, Vector2(0, 118), "رحلة الأبطال", HORIZONTAL_ALIGNMENT_CENTER, 720, 18, Color("c9e4f0"))
+    draw_circle(Vector2(360, 575), 86.0, Color("e4ad3b"))
+    draw_circle(Vector2(360, 575), 74.0, Color("1b4f77"))
+    draw_colored_polygon(PackedVector2Array([
+        Vector2(305,610),Vector2(325,535),Vector2(360,505),Vector2(395,535),Vector2(415,610)
+    ]), Color("b85e38"))
+    draw_circle(Vector2(340,555), 5.0, Color("fff0cf"))
+    draw_circle(Vector2(380,555), 5.0, Color("fff0cf"))
+    draw_line(Vector2(344,575), Vector2(376,575), Color("6b2e25"), 4.0)
+    draw_rect(Rect2(110, 720, 500, 105), Color("0b1825"), true)
+    draw_rect(Rect2(110, 720, 500, 105), Color("e5ae36"), false, 4.0)
+    draw_string(ThemeDB.fallback_font, Vector2(0, 765), "العالم 1 • الوادي الأخضر", HORIZONTAL_ALIGNMENT_CENTER, 720, 24, Color("fff0bd"))
+    draw_string(ThemeDB.fallback_font, Vector2(0, 800), "اضغط PLAY للبدء", HORIZONTAL_ALIGNMENT_CENTER, 720, 19, Color("a8e7b0"))
+    draw_rect(Rect2(200, 900, 320, 110), Color("1767a3"), true)
+    draw_rect(Rect2(200, 900, 320, 110), Color("f3bc3b"), false, 6.0)
+    draw_string(ThemeDB.fallback_font, Vector2(0, 970), "PLAY", HORIZONTAL_ALIGNMENT_CENTER, 720, 34, Color.WHITE)
+    draw_string(ThemeDB.fallback_font, Vector2(0, 1145), "BOOT SAFE • الشاشة جاهزة", HORIZONTAL_ALIGNMENT_CENTER, 720, 17, Color("d8e7ef"))
 
 func _configure_level_hazards() -> void:
     match world_id(level_number):
