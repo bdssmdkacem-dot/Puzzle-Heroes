@@ -56,11 +56,7 @@ jobs:
           cp templates/templates/android_release.apk "$HOME/.local/share/godot/export_templates/4.3.stable/android_release.apk"
           echo "4.3.stable" > "$HOME/.local/share/godot/export_templates/4.3.stable/version.txt"
 
-      - name: Validate Godot project
-        run: |
-          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit --verbose
-
-      - name: Generate Android export preset
+      - name: Generate Android export settings
         run: |
           mkdir -p "$HOME/.config/godot"
           cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<EOF
@@ -73,6 +69,10 @@ jobs:
           echo "Godot Android SDK settings:"
           cat "$HOME/.config/godot/editor_settings-4.3.tres"
 
+      - name: Validate Godot project
+        run: |
+          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit --verbose
+
       - name: Create CI debug keystore
         run: |
           mkdir -p build
@@ -84,11 +84,15 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
+      - name: Configure debug keystore in export preset
+        run: |
+          sed -i 's#^keystore/debug=""#keystore/debug="build/debug.keystore"#' export_presets.cfg
+          sed -i 's#^keystore/debug_user=""#keystore/debug_user="androiddebugkey"#' export_presets.cfg
+          sed -i 's#^keystore/debug_password=""#keystore/debug_password="android"#' export_presets.cfg
+          echo "Android keystore settings in CI preset:"
+          grep '^keystore/debug' export_presets.cfg
+
       - name: Export Android APK
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/build/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
           mkdir -p build
           ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug Android build/puzzle_heroes.apk --verbose
