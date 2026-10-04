@@ -197,7 +197,7 @@ var sfx_cursor := 0
 
 func _ready() -> void:
     randomize()
-    _setup_combat_nodes()
+    # Combat rendering is initialized lazily when a level opens.
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
@@ -366,6 +366,8 @@ func _update_music_audio() -> void:
         music_playback.push_frame(Vector2(sample, sample))
 
 func _setup_combat_nodes() -> void:
+    if combat_layer:
+        return
     combat_layer = Node2D.new()
     combat_layer.name = "CombatAnimationLayer"
     add_child(combat_layer)
@@ -827,10 +829,14 @@ func _start_level(selected_level: int) -> void:
     screen_mode = "level"
     screen_transition = 1.0
     result_timer = 0.0
+    if not combat_layer:
+        _setup_combat_nodes()
     _new_level()
 
 func _start_story_level() -> void:
     screen_mode = "level"
+    if not combat_layer:
+        _setup_combat_nodes()
     _new_level()
     queue_redraw()
 
