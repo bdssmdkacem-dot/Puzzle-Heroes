@@ -52,6 +52,7 @@ var daily_claimed := false
 var hazards: Array = []
 var boss_turn := 0
 var boss_enraged := false
+var world_flash := 0.0
 
 var dragging := false
 var drag_start := Vector2.ZERO
@@ -161,6 +162,7 @@ func _process(delta: float) -> void:
     camera_kick = camera_kick.lerp(Vector2.ZERO, minf(1.0, delta * 9.0))
     combo_flash = maxf(0.0, combo_flash - delta * 2.8)
     fever = maxf(0.0, fever - delta)
+    world_flash = maxf(0.0, world_flash - delta * 2.5)
     fever_flash = maxf(0.0, fever_flash - delta * 3.0)
     near_miss_flash = maxf(0.0, near_miss_flash - delta * 3.5)
     _update_tile_animations(delta)
@@ -276,6 +278,7 @@ func _new_level() -> void:
             hazards[y].append(0)
     boss_turn = 0
     boss_enraged = false
+    world_flash = 0.0
     _configure_level_hazards()
 
     _configure_level_goal()
@@ -305,6 +308,16 @@ func _draw() -> void:
         _draw_end_panel()
 
 func _configure_level_hazards() -> void:
+    match world_id(level_number):
+        2:
+            for cell in [Vector2i(0, 0), Vector2i(6, 0), Vector2i(0, 5), Vector2i(6, 5)]:
+                hazards[cell.y][cell.x] = 1
+        3:
+            for cell in [Vector2i(0, 2), Vector2i(6, 2), Vector2i(1, 5), Vector2i(5, 5)]:
+                hazards[cell.y][cell.x] = 2
+        4:
+            for cell in [Vector2i(1, 1), Vector2i(5, 1), Vector2i(3, 3)]:
+                hazards[cell.y][cell.x] = 3
     match level_number:
         5:
             for cell in [Vector2i(1, 1), Vector2i(3, 1), Vector2i(5, 1), Vector2i(2, 4), Vector2i(4, 4)]:
@@ -338,6 +351,52 @@ func _configure_level_goal() -> void:
         _:
             goal_kind = "rocks"
             goal_target = obstacle_hp.size()
+
+func world_id(value: int) -> int:
+    if value <= 3:
+        return 1
+    if value <= 6:
+        return 2
+    if value <= 9:
+        return 3
+    return 4
+
+func world_name(value: int) -> String:
+    match world_id(value):
+        1:
+            return "وادي الأطلال"
+        2:
+            return "قمم الجليد"
+        3:
+            return "غابة الأنياب"
+        4:
+            return "قلعة التنين"
+        _:
+            return "المملكة"
+
+func world_rule(value: int) -> String:
+    match world_id(value):
+        1:
+            return "حجارة • سلاسل"
+        2:
+            return "جليد • سقوط متجمد"
+        3:
+            return "كروم • أقفاص"
+        4:
+            return "لعنة • فوضى"
+        _:
+            return ""
+
+func world_between_event(value: int) -> String:
+    match value:
+        3:
+            return "حدث قصير: خرج الأبطال من الوادي. الجبال المتجمدة أمامهم."
+        6:
+            return "حدث قصير: ذاب الجدار الجليدي. آثار الوحش تقود إلى الغابة."
+        9:
+            return "حدث قصير: انفتحت بوابة التنين. هذه آخر رحلة في الحملة."
+        _:
+            return ""
 
 func _level_objective() -> String:
     match goal_kind:
@@ -554,6 +613,24 @@ func _load_progress() -> void:
         level_stars.resize(11)
 
 func _draw_top_hud() -> void:
+    var wid := world_id(level_number)
+    var panel := Color("2a211b")
+    var accent := Color("e9b62f")
+    match wid:
+        2:
+            panel = Color("172b3a")
+            accent = Color("72d8ff")
+        3:
+            panel = Color("1b3023")
+            accent = Color("7bdc68")
+        4:
+            panel = Color("321c35")
+            accent = Color("c77cff")
+    draw_rect(Rect2(0, 0, 720, 92), panel)
+    draw_rect(Rect2(0, 88, 720, 7), accent)
+    draw_string(ThemeDB.fallback_font, Vector2(30, 35), world_name(level_number), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("fff4d0"))
+    draw_string(ThemeDB.fallback_font, Vector2(30, 67), "NIVEAU %d • %s" % [level_number, level_modifier], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("d7c29a"))
+    draw_string(ThemeDB.fallback_font, Vector2(505, 20), world_rule(level_number), HORIZONTAL_ALIGNMENT_LEFT, 180, 13, accent)
     draw_rect(Rect2(0, 0, 720, 92), Color("2a211b"))
     draw_rect(Rect2(0, 88, 720, 7), Color("e9b62f"))
     draw_string(ThemeDB.fallback_font, Vector2(30, 38), "PUZZLE HEROES", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("fff4d0"))
@@ -570,6 +647,23 @@ func _draw_top_hud() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(375, 48), "+5 حركات %d" % ability_extra_moves, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("ffe7aa"))
 
 func _draw_rescue_scene() -> void:
+    var wid := world_id(level_number)
+    var arena := Color("3b2d20")
+    var accent := Color("d7a52b")
+    match wid:
+        2:
+            arena = Color("24485a")
+            accent = Color("72d8ff")
+        3:
+            arena = Color("23442b")
+            accent = Color("7bdc68")
+        4:
+            arena = Color("4a214d")
+            accent = Color("c77cff")
+    draw_rect(Rect2(12, 102, 696, 558), arena)
+    draw_rect(Rect2(16, 106, 688, 550), accent, false, 5)
+    draw_string(ThemeDB.fallback_font, Vector2(34, 132), world_name(level_number), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("fff0bd"))
+    # Premium illustrated rescue chamber asset.
     # Premium illustrated rescue chamber asset.
     draw_texture_rect(SCENE_TEX, Rect2(18, 108, 684, 548), false)
     # Wall bands and floor.
@@ -662,9 +756,22 @@ func _draw_large_snake(pos: Vector2) -> void:
         draw_arc(p + Vector2(160, 45), 72.0 + hit * 16.0, 0, TAU, 28, Color(1, 0.55, 0.2, snake_hit_flash * 0.75), 8.0)
 
 func _draw_board() -> void:
-    draw_rect(Rect2(24, 666, 672, 580), Color("b98628"))
-    draw_rect(Rect2(32, 674, 656, 564), Color("e8d4a7"))
-    draw_string(ThemeDB.fallback_font, Vector2(48, 698), "MATCH 3", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("68451d"))
+    var wid := world_id(level_number)
+    var frame := Color("b98628")
+    var inner := Color("e8d4a7")
+    match wid:
+        2:
+            frame = Color("4e9fc0")
+            inner = Color("d8edf4")
+        3:
+            frame = Color("4f9b50")
+            inner = Color("dcebd3")
+        4:
+            frame = Color("8750a8")
+            inner = Color("ead8ee")
+    draw_rect(Rect2(24, 666, 672, 580), frame)
+    draw_rect(Rect2(32, 674, 656, 564), inner)
+    draw_string(ThemeDB.fallback_font, Vector2(48, 698), "MATCH 3 • " + world_name(level_number), HORIZONTAL_ALIGNMENT_LEFT, 500, 17, Color("68451d"))
 
     for y in ROWS:
         for x in COLS:
@@ -988,6 +1095,14 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             near_miss_flash = 1.0
             message = "SÉRIE TERMINÉE ! Prépare le prochain COMBO."
 
+    if world_id(level_number) == 2 and moves % 4 == 0:
+        var ice_cell := Vector2i(randi() % COLS, randi() % ROWS)
+        hazards[ice_cell.y][ice_cell.x] = 1
+        message = "الصقيع يتسع! اكسر الجليد."
+    elif world_id(level_number) == 3 and moves % 3 == 0:
+        var vine_cell := Vector2i(randi() % COLS, randi() % ROWS)
+        hazards[vine_cell.y][vine_cell.x] = 2
+        message = "الكروم تزحف إلى اللوحة!"
     _check_goal()
 func _damage_hazards(matches: Array[Vector2i]) -> void:
     for cell in matches:
@@ -1341,7 +1456,7 @@ func _clear_matches(matches: Array[Vector2i], keep_cell: Vector2i = Vector2i(-1,
             board[cell.y][cell.x] = -1
 
 func _is_special(value: int) -> bool:
-    return value == SPECIAL_H or value == SPECIAL_V or value == SPECIAL_BOMB
+    return value == SPECIAL_H or value == SPECIAL_V or value == SPECIAL_BOMB or value == SPECIAL_COLOR
 
 func _vertical_match_at(matches: Array[Vector2i], cell: Vector2i) -> bool:
     var count := 0
