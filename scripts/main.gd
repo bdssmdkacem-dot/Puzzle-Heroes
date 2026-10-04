@@ -149,6 +149,7 @@ const BEAST_PRO_TEX := preload("res://assets/pack/boss_beast_pro.svg")
 const DRAGON_PRO_TEX := preload("res://assets/pack/boss_dragon_pro.svg")
 const CAPTIVE_PRO_TEX := preload("res://assets/pack/captive_pro.svg")
 const RUINS_ENV_TEX := preload("res://assets/pack/ruins.svg")
+const PARTICLE_TEX := preload("res://assets/pack/particle_glow.svg")
 
 # Premium Content 7: authored 2D animation state.
 var art_idle_phase := 0.0
@@ -915,7 +916,7 @@ func _draw_rescue_scene() -> void:
     draw_rect(Rect2(447, 414, 187, 150), Color("4b3828"))
     draw_line(Vector2(447, 505), Vector2(634, 505), Color("d1a44a"), 8)
     if level_won:
-        draw_texture_rect(CAPTIVE_TEX, Rect2(492, 425, 112, 142), false)
+        draw_texture_rect(CAPTIVE_PRO_TEX, Rect2(492, 420, 112, 142), false)
     else:
         _draw_hero(Vector2(520, 490))
 
@@ -1671,8 +1672,8 @@ func _draw_effects() -> void:
         var p := Vector2(e["p"])
         var kind := int(e.get("kind", 0))
         if kind == 1:
-            draw_circle(p, 7.0 + 9.0 * life, Color(1.0, 0.82, 0.22, life))
-            draw_circle(p, 3.0, Color(1, 1, 1, life))
+            var particle_size := 18.0 + 24.0 * life
+            draw_texture_rect(PARTICLE_TEX, Rect2(p - Vector2.ONE * particle_size * 0.5, Vector2.ONE * particle_size), false, Color(1, 0.88, 0.35, life * 0.9))
             draw_line(p, p - Vector2(e["v"]) * 0.08, Color(1.0, 0.55, 0.12, life), 3.0)
         elif kind == 2:
             draw_circle(p, 6.0 + 7.0 * life, Color(0.72, 0.64, 0.55, life))
