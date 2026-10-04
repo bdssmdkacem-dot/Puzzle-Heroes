@@ -164,6 +164,17 @@ var boss_projectiles: Array = []
 var defeat_burst := 0.0
 var transition_phase := 0.0
 var juice_pulse := 0.0
+var boss_phase := "idle"
+var boss_phase_t := 0.0
+var boss_attack_id := 0
+var boss_attack_cooldown := 0.0
+var guardian_shield := false
+var guardian_shield_break := 0.0
+var beast_rage_sequence := 0.0
+var snake_poison_sequence := 0.0
+var dragon_breath_sequence := 0.0
+var dragon_breath_variant := 0
+var boss_damage_window := false
 
 func _ready() -> void:
     randomize()
@@ -181,6 +192,7 @@ func _process(delta: float) -> void:
     defeat_burst = maxf(0.0, defeat_burst - delta * 1.4)
     transition_phase += delta * 6.0
     juice_pulse = maxf(0.0, juice_pulse - delta * 4.0)
+    _update_boss_combat(delta)
     _update_impact_bursts(delta)
     _update_slash_effects(delta)
     _update_boss_projectiles(delta)
@@ -349,6 +361,17 @@ func _new_level() -> void:
             hazards[y].append(0)
     boss_turn = 0
     boss_enraged = false
+    boss_phase = "idle"
+    boss_phase_t = 0.0
+    boss_attack_id = 0
+    boss_attack_cooldown = 0.0
+    guardian_shield = false
+    guardian_shield_break = 0.0
+    beast_rage_sequence = 0.0
+    snake_poison_sequence = 0.0
+    dragon_breath_sequence = 0.0
+    dragon_breath_variant = 0
+    boss_damage_window = false
     world_flash = 0.0
     _configure_level_hazards()
 
