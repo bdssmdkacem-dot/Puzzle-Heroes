@@ -995,52 +995,236 @@ func boss_for_level(value: int) -> String:
         _:
             return "none"
 
+func _map_panel(rect: Rect2, fill: Color, border: Color = Color("d8a53a"), width: float = 3.0) -> void:
+    draw_rect(rect, Color(0.03, 0.08, 0.12, 0.42), true)
+    draw_rect(rect, fill, true)
+    draw_rect(rect, border, false, width)
+    draw_line(rect.position + Vector2(8, 4), Vector2(rect.end.x - 8, rect.position.y + 4), Color(1, 0.94, 0.72, 0.18), 2.0)
+
+func _map_chip(center: Vector2, label: String, value: String, icon: String, accent: Color) -> void:
+    var r := Rect2(center.x - 76, center.y - 27, 152, 54)
+    draw_rect(r, Color(0.02, 0.05, 0.08, 0.78), true)
+    draw_rect(r, accent, false, 3.0)
+    draw_circle(center + Vector2(-49, 0), 19, Color(0.08, 0.12, 0.15, 0.95))
+    draw_string(ThemeDB.fallback_font, center + Vector2(-59, 8), icon, HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color.WHITE)
+    draw_string(ThemeDB.fallback_font, center + Vector2(-25, -2), label, HORIZONTAL_ALIGNMENT_LEFT, 72, 13, Color("d7e7f1"))
+    draw_string(ThemeDB.fallback_font, center + Vector2(-25, 19), value, HORIZONTAL_ALIGNMENT_LEFT, 78, 18, Color("fff6c8"))
+
+func _draw_map_landscape() -> void:
+    # Commercial fantasy landscape: layered sky, mountains, meadow, rivers and four world landmarks.
+    draw_rect(Rect2(0, 0, 720, 1080), Color("72c5e8"))
+    draw_circle(Vector2(110, 115), 115, Color(0.82, 0.94, 0.97, 0.32))
+    draw_circle(Vector2(620, 135), 130, Color(0.88, 0.96, 1.0, 0.28))
+    var far_mountains := PackedVector2Array([
+        Vector2(0,330), Vector2(80,185), Vector2(145,285), Vector2(235,110),
+        Vector2(315,285), Vector2(415,145), Vector2(510,300), Vector2(610,135),
+        Vector2(720,275), Vector2(720,500), Vector2(0,500)
+    ])
+    draw_colored_polygon(far_mountains, Color("7199b5"))
+    var snow_peaks := PackedVector2Array([
+        Vector2(285,330), Vector2(380,170), Vector2(430,250), Vector2(505,145),
+        Vector2(575,275), Vector2(650,180), Vector2(720,300), Vector2(720,500), Vector2(285,500)
+    ])
+    draw_colored_polygon(snow_peaks, Color("dcecf3"))
+    draw_colored_polygon(PackedVector2Array([Vector2(380,170),Vector2(405,220),Vector2(430,250),Vector2(397,232)]), Color.WHITE)
+    draw_colored_polygon(PackedVector2Array([Vector2(505,145),Vector2(532,210),Vector2(575,275),Vector2(520,225)]), Color.WHITE)
+    draw_colored_polygon(PackedVector2Array([Vector2(650,180),Vector2(680,245),Vector2(720,300),Vector2(665,245)]), Color.WHITE)
+
+    draw_colored_polygon(PackedVector2Array([
+        Vector2(0,330),Vector2(150,300),Vector2(250,345),Vector2(350,315),Vector2(470,365),
+        Vector2(585,330),Vector2(720,380),Vector2(720,1080),Vector2(0,1080)
+    ]), Color("69ad59"))
+
+    # Water system and waterfall.
+    var river := PackedVector2Array([
+        Vector2(0,520),Vector2(95,475),Vector2(165,500),Vector2(220,570),Vector2(300,595),
+        Vector2(370,565),Vector2(435,610),Vector2(500,690),Vector2(575,650),Vector2(720,700),
+        Vector2(720,835),Vector2(590,770),Vector2(510,805),Vector2(435,735),Vector2(350,680),
+        Vector2(285,705),Vector2(195,650),Vector2(125,575),Vector2(0,610)
+    ])
+    draw_colored_polygon(river, Color("168bc0"))
+    draw_polyline(PackedVector2Array([Vector2(0,545),Vector2(95,505),Vector2(165,530),Vector2(220,600),Vector2(300,625),Vector2(370,595),Vector2(435,640),Vector2(500,720),Vector2(575,680),Vector2(720,730)]), Color("a7f3f5"), 7.0)
+    draw_colored_polygon(PackedVector2Array([Vector2(470,470),Vector2(500,455),Vector2(520,470),Vector2(507,640),Vector2(485,640)]), Color(0.78,0.96,1.0,0.82))
+
+    # Forest depth.
+    for p in [Vector2(35,455),Vector2(95,415),Vector2(155,450),Vector2(245,440),Vector2(315,470),Vector2(350,780),Vector2(75,760),Vector2(165,825),Vector2(585,830),Vector2(675,810),Vector2(625,440)]:
+        var s := 1.0 + fmod(abs(p.x + p.y), 3.0) * 0.08
+        draw_circle(p, 27*s, Color("1f633c"))
+        draw_circle(p + Vector2(-5,-12), 22*s, Color("3e8d45"))
+        draw_circle(p + Vector2(8,-21), 15*s, Color("69ad4e"))
+
+    # World landmarks.
+    _draw_map_castle(Vector2(112, 560), Color("4c92c7"))
+    _draw_map_ruins(Vector2(300, 515))
+    _draw_map_ice_castle(Vector2(470, 245))
+    _draw_map_dragon_castle(Vector2(630, 350))
+
+func _draw_map_castle(p: Vector2, roof: Color) -> void:
+    draw_ellipse(p + Vector2(0,55), Vector2(94,22), Color(0.08,0.25,0.18,0.28))
+    draw_rect(Rect2(p.x-58,p.y-10,116,70),Color("ead39e"),true)
+    draw_rect(Rect2(p.x-17,p.y+24,34,36),Color("4b3b35"),true)
+    for x in [-52,38]:
+        draw_rect(Rect2(p.x+x,p.y-50,30,110),Color("f0d9a2"),true)
+        draw_colored_polygon(PackedVector2Array([Vector2(p.x+x-8,p.y-50),Vector2(p.x+x+15,p.y-85),Vector2(p.x+x+38,p.y-50)]),roof)
+    draw_circle(p+Vector2(0,0),8,Color("8de1f2"))
+    draw_arc(p+Vector2(0,0),14,0,TAU,20,Color("ffe67c"),3)
+
+func _draw_map_ruins(p: Vector2) -> void:
+    draw_rect(Rect2(p.x-52,p.y-50,104,105),Color("a99069"),true)
+    draw_rect(Rect2(p.x-30,p.y-10,60,65),Color("4e694e"),true)
+    draw_arc(p+Vector2(0,-5),45,PI,TAU,24,Color("d5c095"),10)
+    draw_line(p+Vector2(-50,55),p+Vector2(50,55),Color("73583c"),7)
+
+func _draw_map_ice_castle(p: Vector2) -> void:
+    draw_ellipse(p+Vector2(0,45),Vector2(78,18),Color(0.1,0.3,0.45,0.22))
+    draw_rect(Rect2(p.x-55,p.y-15,110,62),Color("b8dced"),true)
+    for x in [-48,30]:
+        draw_rect(Rect2(p.x+x,p.y-48,24,80),Color("d9f5ff"),true)
+        draw_colored_polygon(PackedVector2Array([Vector2(p.x+x-7,p.y-48),Vector2(p.x+x+12,p.y-80),Vector2(p.x+x+31,p.y-48)]),Color("58a8dd"))
+    draw_circle(p+Vector2(0,10),7,Color("7de8ff"))
+
+func _draw_map_dragon_castle(p: Vector2) -> void:
+    draw_ellipse(p+Vector2(0,58),Vector2(86,24),Color(0.25,0.03,0.03,0.35))
+    draw_rect(Rect2(p.x-62,p.y-8,124,66),Color("3e2830"),true)
+    for x in [-56,36]:
+        draw_rect(Rect2(p.x+x,p.y-65,26,115),Color("46313b"),true)
+        draw_colored_polygon(PackedVector2Array([Vector2(p.x+x-8,p.y-65),Vector2(p.x+x+13,p.y-102),Vector2(p.x+x+34,p.y-65)]),Color("6f252d"))
+    draw_colored_polygon(PackedVector2Array([Vector2(p.x-16,p.y+58),Vector2(p.x,p.y+20),Vector2(p.x+16,p.y+58)]),Color("f07a31"))
+    draw_circle(p+Vector2(0,20),10,Color("ffb23e"))
+
+func draw_ellipse(center: Vector2, radius: Vector2, color: Color) -> void:
+    draw_set_transform(center, 0.0, radius)
+    draw_circle(Vector2.ZERO, 1.0, color)
+    draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
 func _draw_campaign_map() -> void:
-    draw_rect(Rect2(0, 0, 720, 1280), Color("17120f"))
-    draw_rect(Rect2(0, 0, 720, 120), Color("2a211b"))
-    draw_string(ThemeDB.fallback_font, Vector2(42, 52), "خريطة المغامرة", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, Color("fff0bd"))
-    draw_string(ThemeDB.fallback_font, Vector2(42, 86), "اختر طريقك • افتح الصناديق • اهزم الزعماء", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("d8c39d"))
-    draw_string(ThemeDB.fallback_font, Vector2(525, 48), "★ %d" % stars, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("ffd45b"))
-    draw_string(ThemeDB.fallback_font, Vector2(525, 80), "◆ %d" % coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffe5a1"))
-    draw_string(ThemeDB.fallback_font, Vector2(42, 104), _daily_quest_text(), HORIZONTAL_ALIGNMENT_LEFT, 620, 15, Color("9fe8c0") if not daily_claimed else Color("ffe17a"))
-    var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
-    # World gates make the campaign read as four connected adventures.
-    draw_rect(Rect2(35, 145, 650, 75), Color(0.18,0.12,0.08,0.88))
-    draw_string(ThemeDB.fallback_font, Vector2(55, 172), "WORLD 1 • وادي الأطلال", HORIZONTAL_ALIGNMENT_LEFT, 250, 17, Color("e8b84b"))
-    draw_string(ThemeDB.fallback_font, Vector2(390, 172), "WORLD 2 • قمم الجليد", HORIZONTAL_ALIGNMENT_LEFT, 250, 17, Color("72d8ff"))
-    draw_rect(Rect2(35, 445, 650, 75), Color(0.08,0.16,0.10,0.88))
-    draw_string(ThemeDB.fallback_font, Vector2(55, 472), "WORLD 3 • غابة الأنياب", HORIZONTAL_ALIGNMENT_LEFT, 280, 17, Color("7bdc68"))
-    draw_string(ThemeDB.fallback_font, Vector2(390, 472), "WORLD 4 • قلعة التنين", HORIZONTAL_ALIGNMENT_LEFT, 250, 17, Color("c77cff"))
-    var links := [[0,1],[1,2],[2,3],[2,4],[3,5],[4,5],[5,6],[5,7],[6,8],[7,8],[8,9]]
-    for link in links:
-        var a: Vector2 = nodes[link[0]]
-        var b: Vector2 = nodes[link[1]]
-        draw_line(a,b,Color("5d4934"),18)
-        draw_line(a,b,Color("c89a43"),5)
+    _ensure_art_assets()
+    _draw_map_landscape()
+
+    # Darkened top/bottom chrome keeps the landscape visible while making the HUD readable.
+    draw_rect(Rect2(0,0,720,150),Color(0.02,0.08,0.14,0.48),true)
+    draw_rect(Rect2(0,1040,720,240),Color("102c45"),true)
+    draw_rect(Rect2(0,1040,720,8),Color("e6ad36"),true)
+
+    # Player card.
+    _map_panel(Rect2(18,18,292,116),Color(0.03,0.10,0.17,0.88),Color("e4ad3b"),3)
+    draw_circle(Vector2(70,76),49,Color("e6ad3b"))
+    draw_circle(Vector2(70,76),43,Color("182d40"))
+    if HERO_PRO_TEX:
+        draw_texture_rect(HERO_PRO_TEX,Rect2(35,36,70,82),false)
+    draw_rect(Rect2(120,35,88,34),Color("15518a"),true)
+    draw_rect(Rect2(120,35,88,34),Color("e4ad3b"),false,3)
+    draw_string(ThemeDB.fallback_font,Vector2(139,59),"Lv. 1",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(120,92),"أبطال المملكة",HORIZONTAL_ALIGNMENT_LEFT,165,17,Color("fff0bd"))
+    draw_rect(Rect2(205,80,91,22),Color("071522"),true)
+    draw_rect(Rect2(205,80,32,22),Color("f5b52d"),true)
+    draw_string(ThemeDB.fallback_font,Vector2(212,97),"%d/100" % clampi(stars*4,0,100),HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color.WHITE)
+
+    # Resource HUD.
+    _map_chip(Vector2(375,54),"الطاقة","5/5","+",Color("d74b48"))
+    _map_chip(Vector2(525,54),"الذهب",str(coins),"◆",Color("e4ad3b"))
+    _map_chip(Vector2(665,54),"الألماس","50","♦",Color("62bce8"))
+    draw_circle(Vector2(681,112),27,Color("12283a"))
+    draw_circle(Vector2(681,112),24,Color("334b5d"))
+    draw_string(ThemeDB.fallback_font,Vector2(669,120),"⚙",HORIZONTAL_ALIGNMENT_LEFT,-1,22,Color.WHITE)
+
+    # Left mission cards.
+    _map_panel(Rect2(18,172,122,116),Color(0.03,0.09,0.14,0.88),Color("d8a53a"),3)
+    draw_circle(Vector2(79,202),22,Color("dca52e"))
+    draw_string(ThemeDB.fallback_font,Vector2(68,211),"+",HORIZONTAL_ALIGNMENT_LEFT,-1,25,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(30,246),"المكافأة",HORIZONTAL_ALIGNMENT_LEFT,98,17,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(30,270),"اليومية",HORIZONTAL_ALIGNMENT_LEFT,98,17,Color("ffe17a"))
+    draw_circle(Vector2(125,181),15,Color("d7373f"))
+    draw_string(ThemeDB.fallback_font,Vector2(120,186),"1",HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color.WHITE)
+
+    _map_panel(Rect2(18,302,122,116),Color(0.03,0.09,0.14,0.88),Color("6fb8d6"),3)
+    draw_string(ThemeDB.fallback_font,Vector2(45,337),"☰",HORIZONTAL_ALIGNMENT_LEFT,-1,28,Color("ffe5a0"))
+    draw_string(ThemeDB.fallback_font,Vector2(30,373),"المهام",HORIZONTAL_ALIGNMENT_LEFT,98,18,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(30,399),"%d / %d" % [daily_progress,daily_target],HORIZONTAL_ALIGNMENT_LEFT,98,14,Color("9fe8c0"))
+
+    # World banners.
+    _map_panel(Rect2(174,160,525,54),Color(0.02,0.10,0.16,0.72),Color("dcae45"),2)
+    draw_string(ThemeDB.fallback_font,Vector2(195,194),"WORLD 1",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color("ffe27b"))
+    draw_string(ThemeDB.fallback_font,Vector2(300,193),"الوادي الأخضر",HORIZONTAL_ALIGNMENT_LEFT,210,18,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(565,193),"3 مراحل • 1 زعيم",HORIZONTAL_ALIGNMENT_LEFT,120,14,Color("b9d5df"))
+
+    # Adventure road and level nodes.
+    var nodes := [
+        Vector2(190,830),Vector2(260,760),Vector2(330,795),Vector2(400,700),
+        Vector2(470,735),Vector2(535,640),Vector2(590,570),Vector2(635,500),
+        Vector2(585,430),Vector2(650,350)
+    ]
+    for i in range(nodes.size()-1):
+        draw_line(nodes[i],nodes[i+1],Color(0.10,0.19,0.18,0.62),28)
+        draw_line(nodes[i],nodes[i+1],Color("f0d29a"),18)
+        draw_line(nodes[i],nodes[i+1],Color("fff0bd"),4)
+
     for i in range(nodes.size()):
         var p: Vector2 = nodes[i]
-        var unlocked := _is_level_unlocked(i + 1)
-        var completed: int = level_stars[i + 1]
-        var node_scale := 1.0 + (0.06 * sin(map_pulse * 2.0 + float(i)) if unlocked and i + 1 == unlocked_level else 0.0)
-        draw_circle(p,44 * node_scale,Color("30271f"))
-        draw_circle(p,39,Color("d1a04a") if unlocked else Color("4b443d"))
-        draw_circle(p,31,Color("4d3925") if unlocked else Color("272421"))
-        draw_string(ThemeDB.fallback_font,p+Vector2(-10,9),str(i+1),HORIZONTAL_ALIGNMENT_LEFT,-1,24,Color.WHITE if unlocked else Color("8c857b"))
-        if completed > 0:
-            draw_string(ThemeDB.fallback_font,p+Vector2(-28,62),"★".repeat(completed),HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("ffd45b"))
-        if boss_for_level(i + 1) != "none":
-            draw_circle(p+Vector2(29,-29),13,Color("9d3026"))
-            draw_string(ThemeDB.fallback_font,p+Vector2(22,-23),"B",HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color.WHITE)
-        if i + 1 in [3,6,9]:
-            draw_rect(Rect2(p+Vector2(-13,-63),Vector2(26,20)),Color("8d5a25"))
-            draw_rect(Rect2(p+Vector2(-10,-60),Vector2(20,14)),Color("ffd45b"),false,2)
-    draw_rect(Rect2(50,1100,620,110),Color("241c17"))
-    draw_rect(Rect2(65,1115,590,80),Color("3b2b20"),false,3)
-    draw_string(ThemeDB.fallback_font,Vector2(85,1145),"القدرات",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ffe7aa"))
-    draw_string(ThemeDB.fallback_font,Vector2(85,1177),"مطرقة %d   انفجار %d   +5 حركات %d" % [ability_hammer,ability_blast,ability_extra_moves],HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color.WHITE)
-    draw_string(ThemeDB.fallback_font,Vector2(410,1145),"المراحل المفتوحة: %d/10" % unlocked_levels.size(),HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("d7c29a"))
-    draw_string(ThemeDB.fallback_font,Vector2(410,1177),"اختر مرحلة للبدء",HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("fff0bd"))
-    draw_string(ThemeDB.fallback_font,Vector2(85,1210),"مسار النجوم: %d/25  •  صناديق النجوم: %d" % [stars, claimed_star_chests.size()],HORIZONTAL_ALIGNMENT_LEFT,-1,15,Color("ffd45b"))
+        var unlocked := _is_level_unlocked(i+1)
+        var completed: int = level_stars[i+1]
+        var current := (i+1 == unlocked_level)
+        var pulse := 1.0 + (0.07 * sin(map_pulse*2.0) if current else 0.0)
+        draw_circle(p,52*pulse,Color(0.02,0.06,0.08,0.30))
+        draw_circle(p,43*pulse,Color("e6ad3b") if current else (Color("9fa6aa") if unlocked else Color("46505a")))
+        draw_circle(p,35*pulse,Color("1767a3") if unlocked else Color("2d3439"))
+        draw_string(ThemeDB.fallback_font,p+Vector2(-11,9),str(i+1),HORIZONTAL_ALIGNMENT_LEFT,-1,25,Color.WHITE if unlocked else Color("8b9499"))
+        for s in range(3):
+            var star_pos := p + Vector2(-22 + s*22, 50)
+            var star_color := Color("ffd34f") if s < completed else Color(0.16,0.18,0.19,0.9)
+            draw_string(ThemeDB.fallback_font,star_pos,"★",HORIZONTAL_ALIGNMENT_LEFT,-1,18,star_color)
+        if boss_for_level(i+1) != "none":
+            draw_circle(p+Vector2(31,-31),14,Color("8c2631"))
+            draw_string(ThemeDB.fallback_font,p+Vector2(25,-26),"B",HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color.WHITE)
+        if current:
+            draw_arc(p,57,0,TAU,40,Color("fff0a2"),4)
+
+    # World 1 info card.
+    _map_panel(Rect2(492,820,207,112),Color(0.03,0.10,0.16,0.92),Color("e6ad3b"),3)
+    draw_string(ThemeDB.fallback_font,Vector2(516,858),"WORLD 1",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color("ffe27b"))
+    draw_string(ThemeDB.fallback_font,Vector2(516,887),"الوادي الأخضر",HORIZONTAL_ALIGNMENT_LEFT,165,20,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(516,914),"النجوم  %d / 9" % (level_stars[1]+level_stars[2]+level_stars[3]),HORIZONTAL_ALIGNMENT_LEFT,165,14,Color("bfe6ef"))
+
+    # Bottom navigation and hero action.
+    var tabs := [Rect2(0,1060,170,220),Rect2(170,1060,170,220),Rect2(550,1060,170,220)]
+    var labels := ["الأبطال","المخزون","المتجر"]
+    var icons := ["H","◆","$"]
+    for i in range(3):
+        _map_panel(tabs[i],Color(0.03,0.10,0.16,0.92),Color("284f6d"),2)
+        draw_circle(tabs[i].position+Vector2(85,76),34,Color("1b3f59"))
+        draw_string(ThemeDB.fallback_font,tabs[i].position+Vector2(73,87),icons[i],HORIZONTAL_ALIGNMENT_LEFT,-1,26,Color("f4c75b"))
+        draw_string(ThemeDB.fallback_font,tabs[i].position+Vector2(0,138),labels[i],HORIZONTAL_ALIGNMENT_CENTER,170,19,Color("edf5f8"))
+
+    _map_panel(Rect2(292,1048,136,232),Color(0.03,0.13,0.23,0.98),Color("f2b938"),5)
+    draw_string(ThemeDB.fallback_font,Vector2(320,1125),"⚔",HORIZONTAL_ALIGNMENT_LEFT,-1,58,Color("fff1bd"))
+    draw_string(ThemeDB.fallback_font,Vector2(0,1190),"لعب",HORIZONTAL_ALIGNMENT_CENTER,720,28,Color.WHITE)
+    draw_string(ThemeDB.fallback_font,Vector2(0,1222),"المستوى %d" % unlocked_level,HORIZONTAL_ALIGNMENT_CENTER,720,15,Color("ffe27b"))
+
+    _map_panel(Rect2(428,1060,122,220),Color(0.03,0.10,0.16,0.92),Color("284f6d"),2)
+    draw_circle(Vector2(489,1136),34,Color("1b3f59"))
+    draw_string(ThemeDB.fallback_font,Vector2(474,1147),"◆",HORIZONTAL_ALIGNMENT_LEFT,-1,27,Color("f4c75b"))
+    draw_string(ThemeDB.fallback_font,Vector2(428,1198),"الخريطة",HORIZONTAL_ALIGNMENT_CENTER,122,18,Color("edf5f8"))
+
+    draw_string(ThemeDB.fallback_font,Vector2(22,1030),"مسار المغامرة",HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("fff0bd"))
+    draw_string(ThemeDB.fallback_font,Vector2(560,1030),"النجوم: %d" % stars,HORIZONTAL_ALIGNMENT_LEFT,140,16,Color("ffd34f"))
+
+    if unlock_flash > 0.0:
+        draw_rect(Rect2(170,440,380,78),Color(0.05,0.15,0.20,0.88),true)
+        draw_string(ThemeDB.fallback_font,Vector2(190,488),"مستوى جديد مفتوح!",HORIZONTAL_ALIGNMENT_LEFT,340,23,Color("ffe17a"))
+
+func _handle_map_tap(pos: Vector2) -> void:
+    var nodes := [
+        Vector2(190,830),Vector2(260,760),Vector2(330,795),Vector2(400,700),
+        Vector2(470,735),Vector2(535,640),Vector2(590,570),Vector2(635,500),
+        Vector2(585,430),Vector2(650,350)
+    ]
+    for i in range(nodes.size()):
+        if pos.distance_to(nodes[i]) <= 60.0:
+            _start_level(i + 1)
+            return
+    if pos.x >= 292.0 and pos.x <= 428.0 and pos.y >= 1048.0:
+        _start_level(unlocked_level)
+        return
 
 func _handle_map_tap(pos: Vector2) -> void:
     var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
