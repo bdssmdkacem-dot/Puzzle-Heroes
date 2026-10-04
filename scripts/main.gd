@@ -544,13 +544,9 @@ func _draw_story_screen() -> void:
     draw_rect(Rect2(24, 24, 672, 1232), accent, false, 5)
     draw_string(ThemeDB.fallback_font, Vector2(48, 82), world_name(story_level), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, accent)
     draw_string(ThemeDB.fallback_font, Vector2(48, 145), _story_title(), HORIZONTAL_ALIGNMENT_LEFT, 620, 34, Color("fff0bd"))
-    # Character presentation card; the existing character art is reused at large scale.
-    if story_level == 3:
-        draw_texture_rect(SNAKE_TEX, Rect2(330, 210, 330, 220), false)
-        draw_texture_rect(HERO_TEX, Rect2(55, 220, 220, 300), false)
-    else:
-        draw_texture_rect(HERO_TEX, Rect2(55, 220, 250, 320), false)
-        draw_texture_rect(SNAKE_TEX, Rect2(350, 210, 300, 230), false)
+    # Distinct boss presentation per world.
+    draw_texture_rect(HERO_TEX, Rect2(55, 220, 250, 320), false)
+    _draw_boss_character(Vector2(500, 335), true)
     draw_rect(Rect2(55, 565, 610, 260), Color(0.04,0.03,0.025,0.94))
     draw_string(ThemeDB.fallback_font, Vector2(80, 615), _story_character_name(), HORIZONTAL_ALIGNMENT_LEFT, 550, 22, Color("ffe17a"))
     draw_string(ThemeDB.fallback_font, Vector2(80, 670), _story_body(), HORIZONTAL_ALIGNMENT_LEFT, 550, 19, Color("f3ead8"))
@@ -886,9 +882,11 @@ func _draw_rescue_scene() -> void:
     draw_line(Vector2(80, 190), Vector2(80, 430), Color("ffe17a"), 8)
     draw_line(Vector2(590, 190), Vector2(590, 390), Color("ffe17a"), 8)
 
-    # Large original serpent.
-    var snake_center := Vector2(420, 285 + sin(hero_bounce * 0.7) * 3.0)
-    _draw_large_snake(snake_center)
+    # World-specific environment dressing.
+    _draw_world_environment(wid)
+    # Boss has a distinct silhouette and palette per world.
+    var boss_center := Vector2(420, 285 + sin(hero_bounce * 0.7) * 3.0)
+    _draw_boss_character(boss_center)
 
     # Rescue chamber and captive.
     draw_rect(Rect2(438, 405, 205, 168), Color("241c16"))
@@ -930,6 +928,76 @@ func _draw_hero(pos: Vector2) -> void:
         draw_line(p + Vector2(42, -10), p + Vector2(reach, -10), Color(1.0, 0.84, 0.25, maxf(hero_attack, strike)), 7.0)
         draw_circle(p + Vector2(reach, -10), 8.0 + strike * 7.0, Color(1.0, 0.94, 0.55, strike * 0.8))
 
+func _draw_world_environment(wid: int) -> void:
+    match wid:
+        1:
+            draw_circle(Vector2(105, 155), 70, Color(0.82, 0.55, 0.22, 0.16))
+            draw_circle(Vector2(620, 165), 95, Color(0.95, 0.72, 0.28, 0.12))
+            for x in range(70, 680, 95):
+                draw_rect(Rect2(x, 420, 55, 70), Color("6b4b2f"))
+                draw_polygon(PackedVector2Array([Vector2(x,420),Vector2(x+28,385),Vector2(x+55,420)]), PackedColorArray([Color("8b663f")]))
+        2:
+            draw_circle(Vector2(120, 190), 105, Color(0.40, 0.82, 1.0, 0.12))
+            draw_circle(Vector2(610, 220), 120, Color(0.55, 0.90, 1.0, 0.10))
+            for x in range(45, 700, 110):
+                draw_polygon(PackedVector2Array([Vector2(x,450),Vector2(x+48,340),Vector2(x+96,450)]), PackedColorArray([Color("9ed9e8",0.38)]))
+                draw_line(Vector2(x+20,430),Vector2(x+48,370),Color("d9f7ff",0.5),5)
+        3:
+            draw_circle(Vector2(105, 175), 115, Color(0.22, 0.72, 0.30, 0.13))
+            draw_circle(Vector2(625, 185), 100, Color(0.38, 0.86, 0.30, 0.12))
+            for x in range(35, 700, 85):
+                draw_line(Vector2(x,450),Vector2(x+35,335),Color("3d7d3f",0.55),13)
+                draw_circle(Vector2(x+35,335),18,Color("66a94e",0.55))
+        4:
+            draw_circle(Vector2(115, 165), 100, Color(0.62, 0.30, 0.90, 0.14))
+            draw_circle(Vector2(620, 175), 120, Color(0.95, 0.35, 0.75, 0.10))
+            for x in range(60, 680, 120):
+                draw_rect(Rect2(x, 330, 18, 125), Color("5d2b75",0.75))
+                draw_circle(Vector2(x+9,330),28,Color("a45dd1",0.55))
+
+func _draw_boss_character(pos: Vector2, story: bool = false) -> void:
+    var pulse := 1.0 + sin(snake_boss_phase * 2.0) * (0.035 if combat_active else 0.018)
+    var bob := sin(snake_boss_phase) * (7.0 if combat_active else 3.0)
+    var p := pos + Vector2(0,bob)
+    var s := 1.0 if story else 0.86
+    if boss_kind == "snake":
+        _draw_large_snake(p)
+        return
+    if boss_kind == "guardian":
+        var body := Color("6c89a8")
+        draw_circle(p + Vector2(0,30), 112*s*pulse, Color("27374c"))
+        draw_rect(Rect2(p + Vector2(-92,-25)*s, Vector2(184,125)*s), body)
+        draw_circle(p + Vector2(0,-35)*s, 78*s, Color("a9c6dc"))
+        draw_circle(p + Vector2(-28,-43)*s, 11*s, Color("17202d"))
+        draw_circle(p + Vector2(28,-43)*s, 11*s, Color("17202d"))
+        draw_line(p+Vector2(-78,20)*s,p+Vector2(78,20)*s,Color("d8f2ff"),9*s)
+        draw_arc(p,125*s,0,TAU,32,Color("72d8ff",0.55),7*s)
+        draw_string(ThemeDB.fallback_font,p+Vector2(-115,-135)*s,"BOSS • الحارس",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("bdeeff"))
+    elif boss_kind == "beast":
+        var fur := Color("8d513c")
+        draw_circle(p + Vector2(0,28), 118*s*pulse, Color("3b2019"))
+        draw_circle(p + Vector2(0,-38)*s, 88*s, fur)
+        draw_circle(p + Vector2(-31,-48)*s, 13*s, Color("ff5d45"))
+        draw_circle(p + Vector2(31,-48)*s, 13*s, Color("ff5d45"))
+        draw_polygon(PackedVector2Array([p+Vector2(-70,-92)*s,p+Vector2(-25,-155)*s,p+Vector2(-5,-92)*s]),PackedColorArray([Color("6f382c")]))
+        draw_polygon(PackedVector2Array([p+Vector2(70,-92)*s,p+Vector2(25,-155)*s,p+Vector2(5,-92)*s]),PackedColorArray([Color("6f382c")]))
+        draw_line(p+Vector2(-65,28)*s,p+Vector2(-105,82)*s,Color("b76a4e"),18*s)
+        draw_line(p+Vector2(65,28)*s,p+Vector2(105,82)*s,Color("b76a4e"),18*s)
+        draw_arc(p,130*s,0,TAU,32,Color("ff6d42",0.42),8*s)
+        draw_string(ThemeDB.fallback_font,p+Vector2(-110,-145)*s,"BOSS • الوحش",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ffc2a8"))
+    elif boss_kind == "dragon":
+        var scale := s*pulse
+        draw_circle(p+Vector2(0,15),125*scale,Color("351a50"))
+        draw_polygon(PackedVector2Array([p+Vector2(-82,-35)*scale,p+Vector2(-190,-115)*scale,p+Vector2(-105,35)*scale]),PackedColorArray([Color("7b42a6")]))
+        draw_polygon(PackedVector2Array([p+Vector2(82,-35)*scale,p+Vector2(190,-115)*scale,p+Vector2(105,35)*scale]),PackedColorArray([Color("7b42a6")]))
+        draw_circle(p+Vector2(0,-50)*scale,82*scale,Color("9c5bc2"))
+        draw_circle(p+Vector2(-30,-58)*scale,12*scale,Color("ffcf55"))
+        draw_circle(p+Vector2(30,-58)*scale,12*scale,Color("ffcf55"))
+        draw_polygon(PackedVector2Array([p+Vector2(-48,-105)*scale,p+Vector2(-20,-175)*scale,p+Vector2(-2,-108)*scale]),PackedColorArray([Color("c77cff")]))
+        draw_polygon(PackedVector2Array([p+Vector2(48,-105)*scale,p+Vector2(20,-175)*scale,p+Vector2(2,-108)*scale]),PackedColorArray([Color("c77cff")]))
+        draw_arc(p,150*scale,0,TAU,36,Color("c77cff",0.5),9*scale)
+        draw_string(ThemeDB.fallback_font,p+Vector2(-110,-175)*scale,"BOSS • التنين",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ead0ff"))
+
 func _draw_large_snake(pos: Vector2) -> void:
     var hit := sin((1.0 - snake_hit_flash) * PI) if snake_hit_flash > 0.0 else 0.0
     var boss_bob := sin(snake_boss_phase) * (5.0 if combat_active else 2.0)
@@ -941,21 +1009,15 @@ func _draw_large_snake(pos: Vector2) -> void:
     var p := pos + Vector2(recoil + shake, boss_bob)
     size *= boss_pulse_scale
     var old_modulate := modulate
-    if boss_kind == "guardian":
-        modulate = Color(0.55, 0.72, 1.0, 1.0)
-    elif boss_kind == "beast":
-        modulate = Color(0.82, 0.48, 0.36, 1.0)
-    elif boss_kind == "dragon":
-        modulate = Color(0.72, 0.42, 0.95, 1.0)
     draw_texture_rect(SNAKE_TEX, Rect2(p - size * 0.5, size), false)
     modulate = old_modulate
     if combat_active:
         draw_arc(p + Vector2(145, 35), 188.0 + sin(snake_boss_phase * 2.0) * 8.0, PI * 0.15, PI * 0.85, 28, Color(1.0, 0.32, 0.16, 0.22), 8.0)
-        draw_string(ThemeDB.fallback_font, p + Vector2(-155, -120), "BOSS • " + _boss_name(), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.46, 0.28, 0.88))
+        draw_string(ThemeDB.fallback_font, p + Vector2(-155, -120), "BOSS • الأفعى", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.46, 0.28, 0.88))
         draw_string(ThemeDB.fallback_font, p + Vector2(-150, -94), "PV %d/%d" % [snake_hp, boss_max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe0b0"))
     if snake_hit_flash > 0.0:
-        draw_circle(p + Vector2(160, 45), 58.0 + hit * 12.0, Color(1, 0.9, 0.2, snake_hit_flash * 0.28))
-        draw_arc(p + Vector2(160, 45), 72.0 + hit * 16.0, 0, TAU, 28, Color(1, 0.55, 0.2, snake_hit_flash * 0.75), 8.0)
+        draw_circle(p + Vector2(160, 45), 58.0 + hit * 12.0, Color(1,0.9,0.2,snake_hit_flash*0.28))
+        draw_arc(p + Vector2(160,45),72.0+hit*16.0,0,TAU,28,Color(1,0.55,0.2,snake_hit_flash*0.75),8.0)
 
 func _draw_board() -> void:
     var wid := world_id(level_number)
