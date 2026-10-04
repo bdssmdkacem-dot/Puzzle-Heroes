@@ -228,6 +228,15 @@ func _new_level() -> void:
         10:
             moves = 32
             level_modifier = "التنين • لعنة + فوضى"
+    match world_id(level_number):
+        2:
+            moves = max(18, moves - 1)
+            level_modifier += " • صقيع"
+        3:
+            moves = max(18, moves - 1)
+            level_modifier += " • كروم"
+        4:
+            level_modifier += " • قلعة"
     if boss_kind != "none":
         boss_max_hp = 5 + int(level_number / 3) * 2
         snake_hp = boss_max_hp
@@ -460,6 +469,13 @@ func _draw_campaign_map() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(525, 80), "◆ %d" % coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffe5a1"))
     draw_string(ThemeDB.fallback_font, Vector2(42, 104), _daily_quest_text(), HORIZONTAL_ALIGNMENT_LEFT, 620, 15, Color("9fe8c0") if not daily_claimed else Color("ffe17a"))
     var nodes := [Vector2(110,190),Vector2(250,250),Vector2(390,190),Vector2(285,390),Vector2(470,390),Vector2(360,540),Vector2(235,680),Vector2(485,680),Vector2(360,830),Vector2(360,990)]
+    # World gates make the campaign read as four connected adventures.
+    draw_rect(Rect2(35, 145, 650, 75), Color(0.18,0.12,0.08,0.88))
+    draw_string(ThemeDB.fallback_font, Vector2(55, 172), "WORLD 1 • وادي الأطلال", HORIZONTAL_ALIGNMENT_LEFT, 250, 17, Color("e8b84b"))
+    draw_string(ThemeDB.fallback_font, Vector2(390, 172), "WORLD 2 • قمم الجليد", HORIZONTAL_ALIGNMENT_LEFT, 250, 17, Color("72d8ff"))
+    draw_rect(Rect2(35, 445, 650, 75), Color(0.08,0.16,0.10,0.88))
+    draw_string(ThemeDB.fallback_font, Vector2(55, 472), "WORLD 3 • غابة الأنياب", HORIZONTAL_ALIGNMENT_LEFT, 280, 17, Color("7bdc68"))
+    draw_string(ThemeDB.fallback_font, Vector2(390, 472), "WORLD 4 • قلعة التنين", HORIZONTAL_ALIGNMENT_LEFT, 250, 17, Color("c77cff"))
     var links := [[0,1],[1,2],[2,3],[2,4],[3,5],[4,5],[5,6],[5,7],[6,8],[7,8],[8,9]]
     for link in links:
         var a: Vector2 = nodes[link[0]]
