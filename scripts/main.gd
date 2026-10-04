@@ -216,7 +216,7 @@ func _new_level() -> void:
             moves = 32
             level_modifier = "المواجهة النهائية"
     if boss_kind != "none":
-        boss_max_hp = 5 + (level_number / 3) * 2
+        boss_max_hp = 5 + int(level_number / 3) * 2
         snake_hp = boss_max_hp
     level_coins = 0
     combo = 0
@@ -407,7 +407,9 @@ func _draw_end_panel() -> void:
         var earned := 3 if moves >= 12 else (2 if moves >= 6 else 1)
         draw_string(ThemeDB.fallback_font, Vector2(220, 490), "★".repeat(earned), HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("ffd34d"))
         draw_string(ThemeDB.fallback_font, Vector2(190, 545), "%d points" % score, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color.WHITE)
-        draw_string(ThemeDB.fallback_font, Vector2(190, 585), "+%d ◆" % (level_coins + earned * 5), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffe17a"))
+        draw_string(ThemeDB.fallback_font, Vector2(190, 585), "+%d ◆" % (level_coins + earned * 5 + chest_reward), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("ffe17a"))
+        if chest_reward > 0:
+            draw_string(ThemeDB.fallback_font, Vector2(190, 615), "صندوق كنز: +%d ◆ +قدرات" % chest_reward, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ffd45b"))
         draw_rect(Rect2(165, 650, 390, 70), Color("b98220"))
         draw_string(ThemeDB.fallback_font, Vector2(250, 696), "CONTINUER", HORIZONTAL_ALIGNMENT_LEFT, -1, 25, Color.WHITE)
     else:
@@ -552,7 +554,8 @@ func _draw_large_snake(pos: Vector2) -> void:
     draw_texture_rect(SNAKE_TEX, Rect2(p - size * 0.5, size), false)
     if combat_active:
         draw_arc(p + Vector2(145, 35), 188.0 + sin(snake_boss_phase * 2.0) * 8.0, PI * 0.15, PI * 0.85, 28, Color(1.0, 0.32, 0.16, 0.22), 8.0)
-        draw_string(ThemeDB.fallback_font, p + Vector2(-155, -120), "BOSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1.0, 0.46, 0.28, 0.88))
+        draw_string(ThemeDB.fallback_font, p + Vector2(-155, -120), "BOSS • " + _boss_name(), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(1.0, 0.46, 0.28, 0.88))
+        draw_string(ThemeDB.fallback_font, p + Vector2(-150, -94), "PV %d/%d" % [snake_hp, boss_max_hp], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("ffe0b0"))
     if snake_hit_flash > 0.0:
         draw_circle(p + Vector2(160, 45), 58.0 + hit * 12.0, Color(1, 0.9, 0.2, snake_hit_flash * 0.28))
         draw_arc(p + Vector2(160, 45), 72.0 + hit * 16.0, 0, TAU, 28, Color(1, 0.55, 0.2, snake_hit_flash * 0.75), 8.0)
@@ -905,12 +908,7 @@ func _apply_adventure_damage(match_count: int) -> void:
     hero_progress += 1
 
     if hero_progress >= PATH_POINTS.size() - 1:
-        combat_active = true
-        message = "LE SERPENT BLOQUE LA SORTIE ! Attaque-le."
-        var combat_tween := create_tween()
-        combat_tween.set_parallel(true)
-        combat_tween.tween_property(self, "hero_x", PATH_POINTS[-1].x - 48.0, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-        combat_tween.tween_property(self, "hero_y", PATH_POINTS[-1].y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+        _begin_boss_or_finish()
         return
 
     var target: Vector2 = PATH_POINTS[hero_progress]
@@ -920,6 +918,31 @@ func _apply_adventure_damage(match_count: int) -> void:
     hero_tween.tween_property(self, "hero_y", target.y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
     message = "ROCHER DÉTRUIT ! Le héros avance."
+
+func _begin_boss_or_finish() -> void:
+    if boss_kind == "none":
+        _complete_level()
+        return
+    combat_active = true
+    snake_hp = boss_max_hp
+    message = "BOSS: %s • اهزم الزعيم!" % _boss_name()
+    var combat_tween := create_tween()
+    combat_tween.set_parallel(true)
+    combat_tween.tween_property(self, "hero_x", PATH_POINTS[-1].x - 48.0, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+    combat_tween.tween_property(self, "hero_y", PATH_POINTS[-1].y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func _boss_name() -> String:
+    match boss_kind:
+        "snake":
+            return "الأفعى"
+        "guardian":
+            return "الحارس"
+        "beast":
+            return "الوحش"
+        "dragon":
+            return "التنين"
+        _:
+            return "الزعيم"
 
 func _apply_snake_damage(match_count: int) -> void:
     if not combat_active or level_won:
@@ -946,26 +969,12 @@ func _apply_snake_damage(match_count: int) -> void:
         message = "TOUCHE ! Le serpent perd %d PV." % damage
         return
 
-    combat_active = false
-    rescue_open = true
-    level_won = true
     var earned_stars := 1
     if moves >= 12:
         earned_stars = 3
     elif moves >= 6:
         earned_stars = 2
-    stars += earned_stars
-    coins += level_coins + earned_stars * 5
-    best_score = maxi(best_score, score)
-    unlocked_level = maxi(unlocked_level, mini(level_number + 1, 10))
-    if level_number >= 10:
-        campaign_complete = true
-    _save_progress()
-    message = "SAUVETAGE RÉUSSI ! +%d ★  +%d ◆" % [earned_stars, level_coins + earned_stars * 5]
-    rescue_celebration = 1.0
-    screen_shake = 0.25
-    camera_zoom = 1.035
-    _spawn_rescue_celebration()
+    _complete_level()
     var rescue_tween := create_tween()
     rescue_tween.set_parallel(true)
     rescue_tween.tween_property(self, "hero_x", 560.0, 0.65).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -1254,12 +1263,28 @@ func _complete_level() -> void:
         earned_stars = 3
     elif moves >= 6:
         earned_stars = 2
-    stars += earned_stars
-    coins += level_coins + earned_stars * 5
+    var previous_stars: int = level_stars[level_number]
+    if earned_stars > previous_stars:
+        stars += earned_stars - previous_stars
+        level_stars[level_number] = earned_stars
+    level_coins += earned_stars * 5
+    chest_reward = 0
+    if level_number in [3, 6, 9]:
+        chest_reward = 25 + level_number * 5
+        chests_opened += 1
+        ability_hammer += 1
+        ability_blast += 1
+    coins += level_coins + chest_reward
     best_score = maxi(best_score, score)
-    unlocked_level = maxi(unlocked_level, mini(level_number + 1, 10))
+    _unlock_after_level(level_number)
+    unlocked_level = maxi(unlocked_level, level_number + 1)
+    campaign_complete = level_number >= 10
     _save_progress()
-    message = "OBJECTIF RÉUSSI ! +%d ★" % earned_stars
+    rescue_celebration = 1.0
+    screen_shake = 0.25
+    camera_zoom = 1.035
+    _spawn_rescue_celebration()
+    message = "نجاح! +%d ★  +%d ◆%s" % [earned_stars, level_coins + chest_reward, " • صندوق!" if chest_reward > 0 else ""]
 
 
 func _collapse() -> void:
