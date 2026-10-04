@@ -62,22 +62,16 @@ jobs:
 
       - name: Generate Android export preset
         run: |
-          rm -f export_presets.cfg
-          cat > /tmp/create_preset.gd <<'EOF'
-          @tool
-          extends EditorScript
-          func _run():
-              var e := EditorExportPlatformAndroid.new()
-              var presets := EditorExport.get_export_platforms()
-              print("Android export platforms: ", presets)
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "/usr/local/lib/android/sdk"
+          export/android/java_sdk_path = "$JAVA_HOME"
           EOF
-          ./godot-bin/Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit --verbose
-          test -f export_presets.cfg || {
-            echo "Godot did not generate export_presets.cfg automatically."
-            exit 1
-          }
-          echo "Generated export_presets.cfg:"
-          cat export_presets.cfg
+          echo "Godot Android SDK settings:"
+          cat "$HOME/.config/godot/editor_settings-4.3.tres"
 
       - name: Export Android APK
         run: |
