@@ -1,9 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="120" height="150" viewBox="0 0 120 150">
-<defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e85b4f"/><stop offset="1" stop-color="#9f2930"/></linearGradient></defs>
-<ellipse cx="60" cy="140" rx="34" ry="8" fill="#18202b" opacity=".28"/>
-<circle cx="60" cy="42" r="25" fill="#f3c59e"/><path d="M35 39 60 7l27 32-9 3H43z" fill="url(#c)"/>
-<path d="M30 68Q60 52 90 68l-8 49H38z" fill="#315f9f"/><path d="m39 72-22 38" stroke="#f3c59e" stroke-width="10" stroke-linecap="round"/><path d="m81 72 25 27" stroke="#f3c59e" stroke-width="10" stroke-linecap="round"/>
-<path d="m47 116-8 24M73 116l9 24" stroke="#252d39" stroke-width="12" stroke-linecap="round"/>
-<circle cx="51" cy="40" r="3" fill="#242424"/><circle cx="69" cy="40" r="3" fill="#242424"/>
-<path d="M53 53q7 5 14 0" fill="none" stroke="#9b5147" stroke-width="3"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="380" viewBox="0 0 300 380">
+<defs>
+ <linearGradient id="coat" x2="0" y2="1"><stop stop-color="#7044d6"/><stop offset="1" stop-color="#32166f"/></linearGradient>
+ <linearGradient id="gold" x2="0" y2="1"><stop stop-color="#ffe46a"/><stop offset="1" stop-color="#c88718"/></linearGradient>
+ <radialGradient id="skin"><stop stop-color="#ffd19a"/><stop offset="1" stop-color="#b96b42"/></radialGradient>
+</defs>
+<ellipse cx="150" cy="355" rx="76" ry="17" fill="#090706" opacity=".45"/>
+<path d="M98 232L70 330h42l39-78 35 78h42l-38-108z" fill="#17132b"/>
+<path d="M91 160Q82 218 98 255L150 275 202 255Q218 218 209 160z" fill="url(#coat)" stroke="#251249" stroke-width="7"/>
+<path d="M150 202L116 235l34 28 34-28z" fill="#f5c83d"/>
+<path d="M116 160Q112 117 150 104Q188 117 184 160L168 192H132z" fill="url(#skin)" stroke="#6e3a28" stroke-width="6"/>
+<path d="M104 133Q106 73 150 62Q194 73 196 133L177 115 150 126 123 115z" fill="url(#gold)" stroke="#8b5a10" stroke-width="7"/>
+<path d="M115 88Q150 55 185 88L173 111 150 98 127 111z" fill="#efc53e"/>
+<circle cx="136" cy="142" r="5" fill="#281912"/><circle cx="164" cy="142" r="5" fill="#281912"/>
+<path d="M135 160Q150 171 165 160" fill="none" stroke="#7d3e2b" stroke-width="5" stroke-linecap="round"/>
+<path d="M91 177L53 222l27 20 45-36M209 177l38 45-27 20-45-36" fill="url(#coat)" stroke="#251249" stroke-width="7"/>
+<circle cx="56" cy="225" r="18" fill="url(#gold)"/><path d="M56 207v36M38 225h36" stroke="#fff0a0" stroke-width="5"/>
 </svg>
