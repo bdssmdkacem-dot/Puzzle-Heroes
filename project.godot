@@ -12,8 +12,8 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
 window/size/resizable=true
-window/size/fullscreen=true
-window/handheld/immersive_mode=true
+window/size/fullscreen=false
+window/handheld/immersive_mode=false
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
