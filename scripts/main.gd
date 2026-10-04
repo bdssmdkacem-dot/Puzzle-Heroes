@@ -972,6 +972,9 @@ func _draw_boss_character(pos: Vector2, story: bool = false) -> void:
         draw_circle(p + Vector2(28,-43)*s, 11*s, Color("17202d"))
         draw_line(p+Vector2(-78,20)*s,p+Vector2(78,20)*s,Color("d8f2ff"),9*s)
         draw_arc(p,125*s,0,TAU,32,Color("72d8ff",0.55),7*s)
+        if boss_turn % 2 == 0 and combat_active:
+            draw_arc(p + Vector2(0,15), 145*s, -PI*0.75, PI*0.75, 24, Color("d9f7ff",0.72), 11*s)
+            draw_string(ThemeDB.fallback_font,p+Vector2(-90,175)*s,"SHIELD!",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("bdeeff"))
         draw_string(ThemeDB.fallback_font,p+Vector2(-115,-135)*s,"BOSS • الحارس",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("bdeeff"))
     elif boss_kind == "beast":
         var fur := Color("8d513c")
@@ -984,6 +987,11 @@ func _draw_boss_character(pos: Vector2, story: bool = false) -> void:
         draw_line(p+Vector2(-65,28)*s,p+Vector2(-105,82)*s,Color("b76a4e"),18*s)
         draw_line(p+Vector2(65,28)*s,p+Vector2(105,82)*s,Color("b76a4e"),18*s)
         draw_arc(p,130*s,0,TAU,32,Color("ff6d42",0.42),8*s)
+        if boss_enraged and combat_active:
+            var claw := 75.0 + sin(snake_boss_phase * 4.0) * 12.0
+            draw_line(p+Vector2(-55,65)*s,p+Vector2(-55-claw,120)*s,Color("ff714e",0.72),8*s)
+            draw_line(p+Vector2(55,65)*s,p+Vector2(55+claw,120)*s,Color("ff714e",0.72),8*s)
+            draw_string(ThemeDB.fallback_font,p+Vector2(-75,175)*s,"ENRAGÉ!",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ffb29d"))
         draw_string(ThemeDB.fallback_font,p+Vector2(-110,-145)*s,"BOSS • الوحش",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ffc2a8"))
     elif boss_kind == "dragon":
         var scale := s*pulse
@@ -996,6 +1004,11 @@ func _draw_boss_character(pos: Vector2, story: bool = false) -> void:
         draw_polygon(PackedVector2Array([p+Vector2(-48,-105)*scale,p+Vector2(-20,-175)*scale,p+Vector2(-2,-108)*scale]),PackedColorArray([Color("c77cff")]))
         draw_polygon(PackedVector2Array([p+Vector2(48,-105)*scale,p+Vector2(20,-175)*scale,p+Vector2(2,-108)*scale]),PackedColorArray([Color("c77cff")]))
         draw_arc(p,150*scale,0,TAU,36,Color("c77cff",0.5),9*scale)
+        if combat_active:
+            var breath := 110.0 + sin(snake_boss_phase * 3.0) * 25.0
+            draw_line(p+Vector2(0,5)*scale,p+Vector2(0,breath)*scale,Color("ff6df2",0.22),32*scale)
+            draw_line(p+Vector2(0,5)*scale,p+Vector2(0,breath)*scale,Color("ffd36d",0.65),9*scale)
+            draw_circle(p+Vector2(0,breath)*scale,18*scale,Color("ffcf5a",0.7))
         draw_string(ThemeDB.fallback_font,p+Vector2(-110,-175)*scale,"BOSS • التنين",HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("ead0ff"))
 
 func _draw_large_snake(pos: Vector2) -> void:
