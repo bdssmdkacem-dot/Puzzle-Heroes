@@ -176,7 +176,7 @@ func _draw_adventure_area() -> void:
 
     # Obstacles sit between path points.
     for i in range(OBSTACLE_MAX_HP.size()):
-        var pos := (PATH_POINTS[i] + PATH_POINTS[i + 1]) * 0.5
+        var pos: Vector2 = (PATH_POINTS[i] + PATH_POINTS[i + 1]) * 0.5
         _draw_obstacle(pos, i)
 
     # Goal flag.
@@ -286,7 +286,7 @@ func _input(event: InputEvent) -> void:
             _finish_drag(event.position)
 
     elif event is InputEventScreenDrag and dragging:
-        var delta := event.position - drag_start
+        var delta: Vector2 = event.position - drag_start
         if delta.length() >= 34.0:
             _finish_drag(event.position)
 
@@ -300,7 +300,7 @@ func _input(event: InputEvent) -> void:
             _finish_drag(event.position)
 
     elif event is InputEventMouseMotion and dragging:
-        var mouse_delta := event.position - drag_start
+        var mouse_delta: Vector2 = event.position - drag_start
         if mouse_delta.length() >= 34.0:
             _finish_drag(event.position)
 
@@ -403,7 +403,7 @@ func _apply_adventure_damage(match_count: int) -> void:
         combat_tween.tween_property(self, "hero_y", PATH_POINTS[-1].y, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
         return
 
-    var target := PATH_POINTS[hero_progress]
+    var target: Vector2 = PATH_POINTS[hero_progress]
     var hero_tween := create_tween()
     hero_tween.set_parallel(true)
     hero_tween.tween_property(self, "hero_x", target.x, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -440,7 +440,7 @@ func _apply_snake_damage(match_count: int) -> void:
 
 func _spawn_attack_effects(match_count: int) -> void:
     var origin := Vector2(hero_x + 28, hero_y - 8)
-    var target := (PATH_POINTS[obstacle_index] + PATH_POINTS[obstacle_index + 1]) * 0.5 if obstacle_index < PATH_POINTS.size() - 1 else origin
+    var target: Vector2 = (PATH_POINTS[obstacle_index] + PATH_POINTS[obstacle_index + 1]) * 0.5 if obstacle_index < PATH_POINTS.size() - 1 else origin
     for i in range(mini(14, 5 + match_count * 2)):
         var angle := TAU * float(i) / float(maxi(1, 5 + match_count * 2))
         effects.append({
