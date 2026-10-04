@@ -63,6 +63,13 @@ var effects: Array = []
 var refill_anim := 1.0
 var hero_attack := 0.0
 var screen_shake := 0.0
+var goal_kind := "rocks"
+var goal_target := 4
+var goal_progress := 0
+var goal_color := 0
+const SPECIAL_H := 5
+const SPECIAL_V := 6
+const SPECIAL_BOMB := 7
 
 const HERO_TEX := preload("res://assets/art/hero.svg")
 const SNAKE_TEX := preload("res://assets/art/snake.svg")
@@ -128,6 +135,7 @@ func _new_level() -> void:
     hero_attack = 0.0
     screen_shake = 0.0
 
+    _configure_level_goal()
     message = _level_objective()
     level_won = false
     level_lost = false
@@ -144,18 +152,28 @@ func _draw() -> void:
     if level_won or level_lost:
         _draw_end_panel()
 
-func _level_objective() -> String:
+func _configure_level_goal() -> void:
+    goal_progress = 0
+    goal_color = (level_number - 1) % COLORS.size()
     match level_number:
-        1: return "CASSE LE MUR"
-        2: return "PROTÈGE LE HÉROS"
-        3: return "ATTEINS LE SERPENT"
-        4: return "LIBÈRE LE PRISONNIER"
-        5: return "TRAVERSE LE TEMPLE"
-        6: return "BRISE LA PORTE"
-        7: return "SAUVE LE COMPAGNON"
-        8: return "DÉFIE LE GARDIEN"
-        9: return "OUVRE LA SORTIE"
-        _: return "DERNIER COMBAT"
+        2, 5, 8:
+            goal_kind = "collect"
+            goal_target = 12 + level_number * 2
+        4, 7:
+            goal_kind = "special"
+            goal_target = 2
+        _:
+            goal_kind = "rocks"
+            goal_target = 4
+
+func _level_objective() -> String:
+    match goal_kind:
+        "collect":
+            return "COLLECTE %d %s" % [goal_target, TILE_SYMBOLS[goal_color]]
+        "special":
+            return "CRÉE %d BOOSTERS" % goal_target
+        _:
+            return "DÉTRUIS LES OBSTACLES"
 
 func _draw_end_panel() -> void:
     draw_rect(Rect2(55, 350, 610, 430), Color(0.06, 0.04, 0.03, 0.96))
@@ -264,7 +282,7 @@ func _draw_rescue_scene() -> void:
 
     # Objective badge.
     draw_rect(Rect2(250, 120, 220, 42), Color(0.05, 0.04, 0.03, 0.86))
-    var objective := "COMBAT !" if combat_active else ("SAUVETAGE !" if level_won else _level_objective())
+    var objective := "COMBAT !" if combat_active else ("SAUVETAGE !" if level_won else "%s  %d/%d" % [_level_objective(), goal_progress, goal_target])
     draw_string(ThemeDB.fallback_font, Vector2(280, 148), objective, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color("ffe6a1"))
 
 func _draw_hero(pos: Vector2) -> void:
@@ -301,8 +319,23 @@ func _draw_board() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(50, 1271), message, HORIZONTAL_ALIGNMENT_LEFT, 620, 16, Color.WHITE)
 
 func _draw_gem(center: Vector2, value: int) -> void:
-    var src := Rect2(value * 150, 0, 150, 150)
-    draw_texture_rect_region(GEMS_TEX, Rect2(center - Vector2(36, 36), Vector2(72, 72)), src)
+    if value >= 0 and value < COLORS.size():
+        var src := Rect2(value * 150, 0, 150, 150)
+        draw_texture_rect_region(GEMS_TEX, Rect2(center - Vector2(36, 36), Vector2(72, 72)), src)
+        return
+    if value == SPECIAL_H or value == SPECIAL_V:
+        draw_circle(center, 34, Color("f6c443"))
+        draw_circle(center, 28, COLORS[goal_color])
+        if value == SPECIAL_H:
+            draw_rect(Rect2(center.x - 24, center.y - 4, 48, 8), Color.WHITE)
+        else:
+            draw_rect(Rect2(center.x - 4, center.y - 24, 8, 48), Color.WHITE)
+        draw_circle(center, 7, Color("fff4b0"))
+        return
+    draw_circle(center, 33, Color("30283b"))
+    draw_circle(center, 27, Color("ef4f5f"))
+    draw_circle(center, 8, Color("ffe66d"))
+    draw_line(center + Vector2(14, -20), center + Vector2(27, -32), Color("fff0a6"), 5)
 
 func _cell_box() -> StyleBoxFlat:
     var box := StyleBoxFlat.new()
@@ -391,6 +424,31 @@ func _inside(cell: Vector2i) -> bool:
 
 func _try_swap(a: Vector2i, b: Vector2i) -> void:
     _swap(a, b)
+
+    if _is_special(board[a.y][a.x]) or _is_special(board[b.y][b.x]):
+        moves -= 1
+        combo += 1
+        busy = true
+        var special_matches := _activate_special_swap(a, b)
+        if special_matches.is_empty():
+            _swap(a, b)
+            busy = false
+            return
+        last_match_count = special_matches.size()
+        score += special_matches.size() * 18 * (1 + mini(combo - 1, 3))
+        level_coins += maxi(1, special_matches.size() / 4)
+        _spawn_match_bursts(special_matches)
+        _clear_matches(special_matches)
+        _collapse()
+        refill_anim = 0.0
+        hero_attack = 1.0
+        _spawn_attack_effects(special_matches.size())
+        _apply_adventure_damage(special_matches.size())
+        busy = false
+        _check_goal()
+        queue_redraw()
+        return
+
     var matches := _find_matches()
 
     if matches.is_empty():
@@ -408,26 +466,30 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     score += points
     level_coins += maxi(1, matches.size() / 3)
 
-    busy = true
-    message = "+%d points • attaque l'obstacle !" % points
+    if goal_kind == "collect":
+        for cell in matches:
+            if board[cell.y][cell.x] == goal_color:
+                goal_progress = mini(goal_target, goal_progress + 1)
 
+    var special_cell := matches[mini(matches.size() / 2, matches.size() - 1)]
+    var special_value := -1
+    if matches.size() >= 5:
+        special_value = SPECIAL_BOMB
+    elif matches.size() == 4:
+        special_value = SPECIAL_H
+        if _vertical_match_at(matches, special_cell):
+            special_value = SPECIAL_V
+    if special_value >= 0 and goal_kind == "special":
+        goal_progress = mini(goal_target, goal_progress + 1)
+
+    busy = true
+    message = "+%d points • %s" % [points, _level_objective()]
     _spawn_match_bursts(matches)
-    _clear_matches(matches)
+    _clear_matches(matches, special_cell, special_value)
     _collapse()
     refill_anim = 0.0
     hero_attack = 1.0
-
     _spawn_attack_effects(matches.size())
-    if combat_active:
-        _apply_snake_damage(matches.size())
-    else:
-        _apply_adventure_damage(matches.size())
-
-    if moves <= 0 and not level_won:
-        level_lost = true
-        combo = 0
-        message = "Niveau échoué • touche pour réessayer"
-
     busy = false
     queue_redraw()
 
@@ -603,9 +665,82 @@ func _find_matches() -> Array[Vector2i]:
 
     return Array(found.keys())
 
-func _clear_matches(matches: Array[Vector2i]) -> void:
+func _clear_matches(matches: Array[Vector2i], keep_cell: Vector2i = Vector2i(-1, -1), special_value: int = -1) -> void:
     for cell in matches:
-        board[cell.y][cell.x] = -1
+        if cell == keep_cell and special_value >= 0:
+            board[cell.y][cell.x] = special_value
+        else:
+            board[cell.y][cell.x] = -1
+
+func _is_special(value: int) -> bool:
+    return value == SPECIAL_H or value == SPECIAL_V or value == SPECIAL_BOMB
+
+func _vertical_match_at(matches: Array[Vector2i], cell: Vector2i) -> bool:
+    var count := 0
+    for m in matches:
+        if m.x == cell.x:
+            count += 1
+    return count >= 4
+
+func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+    var av := board[a.y][a.x]
+    var bv := board[b.y][b.x]
+    var cells := {}
+    if av == SPECIAL_BOMB and bv == SPECIAL_BOMB:
+        for y in ROWS:
+            for x in COLS:
+                cells[Vector2i(x, y)] = true
+    elif av == SPECIAL_BOMB or bv == SPECIAL_BOMB:
+        var other := b if av == SPECIAL_BOMB else a
+        var color := board[other.y][other.x]
+        for y in ROWS:
+            for x in COLS:
+                if board[y][x] == color:
+                    cells[Vector2i(x, y)] = true
+    else:
+        var first := a
+        if av != SPECIAL_H and av != SPECIAL_V:
+            first = b
+        var fv := board[first.y][first.x]
+        if fv == SPECIAL_H:
+            for x in COLS:
+                cells[Vector2i(x, first.y)] = true
+        else:
+            for y in ROWS:
+                cells[Vector2i(first.x, y)] = true
+        var other_special := b if first == a else a
+        var ov := board[other_special.y][other_special.x]
+        if _is_special(ov):
+            for x in COLS:
+                cells[Vector2i(x, other_special.y)] = true
+            for y in ROWS:
+                cells[Vector2i(other_special.x, y)] = true
+    return Array(cells.keys())
+
+func _check_goal() -> void:
+    if goal_kind == "collect" and goal_progress >= goal_target:
+        _complete_level()
+    elif goal_kind == "special" and goal_progress >= goal_target:
+        _complete_level()
+
+func _complete_level() -> void:
+    if level_won:
+        return
+    level_won = true
+    combat_active = false
+    rescue_open = true
+    var earned_stars := 1
+    if moves >= 12:
+        earned_stars = 3
+    elif moves >= 6:
+        earned_stars = 2
+    stars += earned_stars
+    coins += level_coins + earned_stars * 5
+    best_score = maxi(best_score, score)
+    unlocked_level = maxi(unlocked_level, mini(level_number + 1, 10))
+    _save_progress()
+    message = "OBJECTIF RÉUSSI ! +%d ★" % earned_stars
+
 
 func _collapse() -> void:
     for x in COLS:
