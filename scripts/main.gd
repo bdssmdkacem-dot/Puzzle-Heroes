@@ -223,6 +223,10 @@ func _process(delta: float) -> void:
     defeat_burst = maxf(0.0, defeat_burst - delta * 1.4)
     transition_phase += delta * 6.0
     juice_pulse = maxf(0.0, juice_pulse - delta * 4.0)
+    # Combat rendering is intentionally lazy. The campaign map and normal
+    # Match-3 levels must not wait for SVG/particle initialization.
+    if combat_active and not combat_layer:
+        _setup_combat_nodes()
     _update_boss_combat(delta)
     _update_combat_sprite_layer(delta)
     _update_impact_bursts(delta)
@@ -895,17 +899,18 @@ func _start_level(selected_level: int) -> void:
         screen_mode = "story"
         queue_redraw()
         return
+    # Enter the playable screen first. Heavy combat rendering is initialized lazily
+    # only when a boss is actually active; level 1 must never depend on it.
     screen_mode = "level"
     screen_transition = 1.0
     result_timer = 0.0
-    if not combat_layer:
-        _setup_combat_nodes()
     _new_level()
+    queue_redraw()
 
 func _start_story_level() -> void:
+    # Same rule as normal levels: show the board immediately, then lazily
+    # initialize combat visuals once combat_active becomes true.
     screen_mode = "level"
-    if not combat_layer:
-        _setup_combat_nodes()
     _new_level()
     queue_redraw()
 
