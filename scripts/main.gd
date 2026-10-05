@@ -648,6 +648,8 @@ func _new_level() -> void:
         obstacle_hp.append(hp)
 
     obstacle_index = 0
+    if level_number == 1:
+        obstacle_hp = [1, 1, 1, 1]
     hero_progress = 0
     hero_x = PATH_POINTS[0].x
     hero_y = PATH_POINTS[0].y
@@ -2077,6 +2079,7 @@ func _apply_adventure_damage(match_count: int) -> void:
     if was_alive and obstacle_hp[obstacle_index] == 0:
         goal_progress = mini(goal_target, goal_progress + 1)
         _update_daily_quest("obstacle", 1)
+        message = "ROCHER DÉTRUIT !  %d/%d" % [goal_progress, goal_target]
     rock_impact = 1.0
     attack_flash = 1.0
     snake_alert = 1.0
@@ -2545,7 +2548,9 @@ func _spawn_booster_paths(cells: Array[Vector2i]) -> void:
                 booster_paths.append({"from": center, "to": center + dir * CELL * 1.9, "t": 0.0, "life": 0.24})
 
 func _check_goal() -> void:
-    if goal_kind == "collect" and goal_progress >= goal_target:
+    if goal_kind == "rocks" and goal_progress >= goal_target:
+        _complete_level()
+    elif goal_kind == "collect" and goal_progress >= goal_target:
         _complete_level()
     elif goal_kind == "special" and goal_progress >= goal_target:
         _complete_level()
