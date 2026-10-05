@@ -1266,17 +1266,30 @@ func _draw_campaign_map() -> void:
         draw_string(ThemeDB.fallback_font,Vector2(190,488),"مستوى جديد مفتوح!",HORIZONTAL_ALIGNMENT_LEFT,340,23,Color("ffe17a"))
 
 func _handle_map_tap(pos: Vector2) -> void:
+    # Commercial map: generous hit targets so the level starts reliably on phones.
+    # The visual node remains small; its interactive target is intentionally larger.
     var nodes := [
         Vector2(190,830),Vector2(260,760),Vector2(330,795),Vector2(400,700),
         Vector2(470,735),Vector2(535,640),Vector2(590,570),Vector2(635,500),
         Vector2(585,430),Vector2(650,350)
     ]
     for i in range(nodes.size()):
-        if pos.distance_to(nodes[i]) <= 60.0:
-            _start_level(i + 1)
+        var level_id := i + 1
+        if not _is_level_unlocked(level_id):
+            continue
+        if pos.distance_to(nodes[i]) <= 105.0:
+            _start_level(level_id)
             return
-    if pos.x >= 292.0 and pos.x <= 428.0 and pos.y >= 1048.0:
+
+    # Large central PLAY button. Accept taps across the complete visual button.
+    if pos.x >= 260.0 and pos.x <= 460.0 and pos.y >= 1020.0 and pos.y <= 1280.0:
         _start_level(unlocked_level)
+        return
+
+    # On narrow/letterboxed Android displays, also accept a tap near the
+    # first unlocked node even if the canvas transform lands a few pixels away.
+    if unlocked_level == 1 and pos.y >= 680.0 and pos.y <= 930.0 and pos.x >= 100.0 and pos.x <= 360.0:
+        _start_level(1)
         return
 
 
