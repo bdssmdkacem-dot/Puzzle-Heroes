@@ -1952,8 +1952,8 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         if combat_active:
             _apply_snake_damage(matches.size())
         _spawn_attack_effects(matches.size())
-    _set_combat_animation("attack")
-    _emit_combat_particles(true, mini(40, 14 + matches.size() * 4))
+        _set_combat_animation("attack")
+        _emit_combat_particles(true, mini(40, 14 + matches.size() * 4))
         _collapse()
         refill_anim = 0.0
         hero_attack = 1.0
