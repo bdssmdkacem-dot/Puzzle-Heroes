@@ -340,8 +340,6 @@ func _play_sfx(kind: String, intensity: float = 1.0) -> void:
             freq = base * (1.0 + 0.12 * sin(t * 18.0))
         var sample := sin(TAU * freq * t) * env * 0.24
         sample += sin(TAU * freq * 2.01 * t) * env * 0.08
-        if noise > 0.0:
-            sample += randf_range(-noise, noise) * env
         pb.push_frame(Vector2(sample, sample))
 
 func _update_music_audio() -> void:
@@ -2428,8 +2426,8 @@ func _vertical_match_at(matches: Array[Vector2i], cell: Vector2i) -> bool:
     return count >= 4
 
 func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
-    var av := board[a.y][a.x]
-    var bv := board[b.y][b.x]
+    var av: int = int(board[a.y][a.x])
+    var bv: int = int(board[b.y][b.x])
     var cells := {}
     if av == SPECIAL_COLOR or bv == SPECIAL_COLOR:
         var color_other := bv if av == SPECIAL_COLOR else av
@@ -2448,7 +2446,7 @@ func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
                 cells[Vector2i(x, y)] = true
     elif av == SPECIAL_BOMB or bv == SPECIAL_BOMB:
         var other := b if av == SPECIAL_BOMB else a
-        var color := board[other.y][other.x]
+        var color: int = int(board[other.y][other.x])
         for y in ROWS:
             for x in COLS:
                 if board[y][x] == color or _is_special(board[y][x]):
@@ -2463,8 +2461,8 @@ func _activate_special_swap(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
     else:
         var first := a if _is_special(av) else b
         var second := b if first == a else a
-        var fv := board[first.y][first.x]
-        var sv := board[second.y][second.x]
+        var fv: int = int(board[first.y][first.x])
+        var sv: int = int(board[second.y][second.x])
         if (fv == SPECIAL_H and sv == SPECIAL_V) or (fv == SPECIAL_V and sv == SPECIAL_H):
             for x in COLS:
                 cells[Vector2i(x, first.y)] = true
