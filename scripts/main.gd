@@ -356,7 +356,7 @@ func _update_music_audio() -> void:
         var t := audio_time - float(available - i) / sr
         var step := int(floor(t / (beat * 0.5))) % notes.size()
         var local := fmod(t, beat * 0.5)
-        var freq := notes[step]
+        var freq: float = float(notes[step])
         if combat_active:
             freq *= 0.5
         var env := 0.035 * maxf(0.0, 1.0 - local / (beat * 0.5))
