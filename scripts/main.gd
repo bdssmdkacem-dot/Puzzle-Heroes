@@ -52,6 +52,7 @@ var daily_kind := "matches"
 var daily_target := 20
 var daily_progress := 0
 var daily_claimed := false
+var map_play_button: Button
 var hazards: Array = []
 var boss_turn := 0
 var boss_enraged := false
@@ -205,6 +206,10 @@ func _ready() -> void:
     _load_progress()
     _refresh_daily_quest()
     screen_mode = "map"
+    map_play_button = get_node_or_null("MapPlayButton") as Button
+    if map_play_button:
+        map_play_button.pressed.connect(_on_map_play_pressed)
+        map_play_button.visible = true
     set_process(true)
     queue_redraw()
 
@@ -212,8 +217,12 @@ func _process(delta: float) -> void:
     # Map mode runs only its lightweight visual pulse; gameplay systems stay dormant.
     if screen_mode == "map":
         map_pulse += delta * 2.0
+        if map_play_button:
+            map_play_button.visible = true
         queue_redraw()
         return
+    if map_play_button:
+        map_play_button.visible = false
     audio_time += delta
     hero_bounce += delta * 5.0
     art_idle_phase += delta * 4.0
@@ -1269,6 +1278,11 @@ func _draw_campaign_map() -> void:
     if unlock_flash > 0.0:
         draw_rect(Rect2(170,440,380,78),Color(0.05,0.15,0.20,0.88),true)
         draw_string(ThemeDB.fallback_font,Vector2(190,488),"مستوى جديد مفتوح!",HORIZONTAL_ALIGNMENT_LEFT,340,23,Color("ffe17a"))
+
+func _on_map_play_pressed() -> void:
+    # Real Godot UI input path: independent from Canvas/Node2D touch handling.
+    if screen_mode == "map":
+        _start_level(1)
 
 func _handle_map_tap(pos: Vector2) -> void:
     # Commercial map: generous hit targets so the level starts reliably on phones.
