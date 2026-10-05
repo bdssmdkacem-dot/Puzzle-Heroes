@@ -198,14 +198,18 @@ var sfx_cursor := 0
 
 func _ready() -> void:
     randomize()
-    # Boot must be completely deterministic: no filesystem, time, audio, combat or art work here.
+    # Startup is now safe: the script is validated and the map uses only primitive drawing.
+    _load_progress()
+    _refresh_daily_quest()
     screen_mode = "map"
     set_process(true)
     queue_redraw()
 
 func _process(delta: float) -> void:
-    # Do not execute any runtime loop while the safe boot/map screen is active.
+    # Map mode runs only its lightweight visual pulse; gameplay systems stay dormant.
     if screen_mode == "map":
+        map_pulse += delta * 2.0
+        queue_redraw()
         return
     audio_time += delta
     hero_bounce += delta * 5.0
@@ -707,10 +711,9 @@ func _new_level() -> void:
     busy = false
 
 func _draw() -> void:
-    # ROOT BOOT DIAGNOSTIC: only primitive CanvasItem drawing on the first screen.
-    # No SVGs, particles, transforms, dynamic collections or gameplay code.
+    # The campaign map is the real first screen. It is asset-free and safe at startup.
     if screen_mode == "map":
-        _draw_safe_boot()
+        _draw_campaign_map()
         return
     var impact := sin((1.0 - screen_shake) * PI) if screen_shake > 0.0 else 0.0
     camera_kick = Vector2(sin(hero_anim_phase * 17.0), cos(hero_anim_phase * 13.0)) * screen_shake * 7.0
