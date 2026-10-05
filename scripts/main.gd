@@ -333,7 +333,7 @@ func _play_sfx(kind: String, intensity: float = 1.0) -> void:
     for i in range(mini(frames, pb.get_frames_available())):
         var t := float(i) / sr
         var env := minf(1.0, t * 55.0) * maxf(0.0, 1.0 - t / duration)
-        var freq := base * (1.0 + 0.035 * sin(t * 31.0))
+        var freq: float = base * (1.0 + 0.035 * sin(t * 31.0))
         if kind == "win":
             freq = base * (1.0 + 0.5 * sin(t * TAU * 2.0))
         elif kind == "combo":
