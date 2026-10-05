@@ -1885,8 +1885,6 @@ func _input_to_design(pos: Vector2) -> Vector2:
     # Godot's canvas transform already knows the Android stretch/letterbox.
     # Invert it so a physical touch maps to the same 720x1280 coordinates used by the board.
     var canvas := get_canvas_transform()
-    if not canvas.is_finite():
-        return pos
     return canvas.affine_inverse() * pos
 
 func _screen_to_cell(pos: Vector2) -> Vector2i:
