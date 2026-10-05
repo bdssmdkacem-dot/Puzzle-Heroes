@@ -1749,7 +1749,13 @@ func _input(event: InputEvent) -> void:
         return
     if screen_mode == "map":
         if event is InputEventScreenTouch and event.pressed:
-            _handle_map_tap(_input_to_design(event.position))
+            var map_pos := _input_to_design(event.position)
+            # Guaranteed Android fallback: level 1 is always playable.
+            # This avoids any dependency on the map's visual hitbox/scale.
+            if unlocked_level <= 1:
+                _start_level(1)
+            else:
+                _handle_map_tap(map_pos)
         elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
             _handle_map_tap(event.position)
         return
