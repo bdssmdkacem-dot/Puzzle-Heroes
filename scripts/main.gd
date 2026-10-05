@@ -69,6 +69,7 @@ var drag_start := Vector2.ZERO
 var drag_cell := Vector2i(-1, -1)
 var drag_visual_pos := Vector2.ZERO
 var active_touch_index := -1
+var selected_cell := Vector2i(-1, -1)
 var busy := false
 
 var message := "Aligne 3 tuiles pour casser le rocher !"
@@ -673,6 +674,7 @@ func _new_level() -> void:
     art_defeat_phase = 0.0
     screen_shake = 0.0
     swap_animating = false
+    selected_cell = Vector2i(-1, -1)
     collapse_animating = false
     booster_paths.clear()
     vfx_rings.clear()
@@ -1342,9 +1344,9 @@ func _refresh_daily_quest() -> void:
         return
     daily_day = today
     var day_number := int(today.replace("-", ""))
-    var variants := ["matches", "combo", "special"]
+    var variants := ["matches", "combo", "special", "obstacle"]
     daily_kind = variants[day_number % variants.size()]
-    daily_target = 20 if daily_kind == "matches" else (4 if daily_kind == "combo" else 3)
+    daily_target = 20 if daily_kind == "matches" else (4 if daily_kind == "combo" else (3 if daily_kind == "special" else 4))
     daily_progress = 0
     daily_claimed = false
     _save_progress()
@@ -1353,7 +1355,7 @@ func _daily_quest_text() -> String:
     _refresh_daily_quest()
     if daily_claimed:
         return "مهمة اليوم ✓ مكتملة • مكافأة +50 ◆"
-    var label := "طابق القطع" if daily_kind == "matches" else ("حقق COMBO x4" if daily_kind == "combo" else "أنشئ Boosters")
+    var label := "طابق القطع" if daily_kind == "matches" else ("حقق COMBO x4" if daily_kind == "combo" else ("أنشئ Boosters" if daily_kind == "special" else "دمر العوائق"))
     return "مهمة اليوم: %s  %d/%d  •  المكافأة 50 ◆" % [label, daily_progress, daily_target]
 
 func _update_daily_quest(kind: String, amount: int = 1) -> void:
@@ -1743,42 +1745,84 @@ func _input(event: InputEvent) -> void:
         if _handle_ability_tap(event.position):
             return
 
-    # Android / iOS touch. Normalize to the 720x1280 design space.
+    # Touch/mouse board interaction.
+    # Use the canvas transform instead of guessing from physical viewport size.
     if event is InputEventScreenTouch:
+        var touch_pos: Vector2 = _input_to_design(event.position)
         if event.pressed and active_touch_index == -1:
             active_touch_index = event.index
-            drag_start = _input_to_design(event.position)
-            drag_cell = _screen_to_cell(drag_start)
-            drag_visual_pos = drag_start
+            drag_start = touch_pos
+            drag_cell = _screen_to_cell(touch_pos)
+            drag_visual_pos = touch_pos
             dragging = drag_cell.x >= 0
+            if dragging:
+                # Tap-to-select + tap-adjacent is supported in addition to swiping.
+                if selected_cell.x >= 0 and _inside(selected_cell):
+                    var tap_delta := drag_cell - selected_cell
+                    if abs(tap_delta.x) + abs(tap_delta.y) == 1 and not busy:
+                        var first := selected_cell
+                        selected_cell = Vector2i(-1, -1)
+                        dragging = false
+                        active_touch_index = -1
+                        _try_swap(first, drag_cell)
+                        return
+                selected_cell = drag_cell
+                queue_redraw()
         elif not event.pressed and event.index == active_touch_index:
             if dragging:
-                _finish_drag(_input_to_design(event.position))
+                var release_pos: Vector2 = _input_to_design(event.position)
+                var release_delta := release_pos - drag_start
+                if release_delta.length() >= 18.0:
+                    _finish_drag(release_pos)
             dragging = false
             active_touch_index = -1
+            queue_redraw()
 
     elif event is InputEventScreenDrag and dragging and event.index == active_touch_index:
         var current_pos: Vector2 = _input_to_design(event.position)
         drag_visual_pos = current_pos
         var delta: Vector2 = current_pos - drag_start
-        if delta.length() >= 28.0:
+        if delta.length() >= 18.0:
             _finish_drag(current_pos)
+            selected_cell = Vector2i(-1, -1)
+            active_touch_index = -1
+            queue_redraw()
 
     # Mouse input is useful for desktop testing.
     elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+        var mouse_pos: Vector2 = _input_to_design(event.position)
         if event.pressed:
-            drag_start = event.position
-            drag_visual_pos = event.position
-            drag_cell = _screen_to_cell(event.position)
+            drag_start = mouse_pos
+            drag_visual_pos = mouse_pos
+            drag_cell = _screen_to_cell(mouse_pos)
             dragging = drag_cell.x >= 0
+            if dragging:
+                if selected_cell.x >= 0 and _inside(selected_cell):
+                    var tap_delta := drag_cell - selected_cell
+                    if abs(tap_delta.x) + abs(tap_delta.y) == 1 and not busy:
+                        var first := selected_cell
+                        selected_cell = Vector2i(-1, -1)
+                        dragging = false
+                        _try_swap(first, drag_cell)
+                        return
+                selected_cell = drag_cell
+                queue_redraw()
         elif dragging:
-            _finish_drag(event.position)
+            var mouse_release: Vector2 = _input_to_design(event.position)
+            if (mouse_release - drag_start).length() >= 18.0:
+                _finish_drag(mouse_release)
+                selected_cell = Vector2i(-1, -1)
+            dragging = false
+            queue_redraw()
 
     elif event is InputEventMouseMotion and dragging:
-        drag_visual_pos = event.position
-        var mouse_delta: Vector2 = event.position - drag_start
-        if mouse_delta.length() >= 34.0:
-            _finish_drag(event.position)
+        var mouse_current: Vector2 = _input_to_design(event.position)
+        drag_visual_pos = mouse_current
+        var mouse_delta: Vector2 = mouse_current - drag_start
+        if mouse_delta.length() >= 18.0:
+            _finish_drag(mouse_current)
+            selected_cell = Vector2i(-1, -1)
+            queue_redraw()
 
 func _handle_ability_tap(pos: Vector2) -> bool:
     if pos.y < 12.0 or pos.y > 82.0:
@@ -1838,10 +1882,12 @@ func _finish_drag(pos: Vector2) -> void:
         _try_swap(drag_cell, end_cell)
 
 func _input_to_design(pos: Vector2) -> Vector2:
-    var viewport_size := get_viewport().get_visible_rect().size
-    if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+    # Godot's canvas transform already knows the Android stretch/letterbox.
+    # Invert it so a physical touch maps to the same 720x1280 coordinates used by the board.
+    var canvas := get_canvas_transform()
+    if not canvas.is_finite():
         return pos
-    return Vector2(pos.x * 720.0 / viewport_size.x, pos.y * 1280.0 / viewport_size.y)
+    return canvas.affine_inverse() * pos
 
 func _screen_to_cell(pos: Vector2) -> Vector2i:
     var x := int(floor((pos.x - BOARD_X) / CELL))
@@ -2027,8 +2073,12 @@ func _apply_adventure_damage(match_count: int) -> void:
     if match_count >= 7:
         damage = 3
 
+    var was_alive: bool = obstacle_hp[obstacle_index] > 0
     obstacle_hp[obstacle_index] = max(0, obstacle_hp[obstacle_index] - damage)
     obstacle_flash = 1.0
+    if was_alive and obstacle_hp[obstacle_index] == 0:
+        goal_progress = mini(goal_target, goal_progress + 1)
+        _update_daily_quest("obstacle", 1)
     rock_impact = 1.0
     attack_flash = 1.0
     snake_alert = 1.0
