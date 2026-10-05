@@ -114,6 +114,8 @@ var fever := 0.0
 var fever_flash := 0.0
 var streak_best := 0
 var near_miss_flash := 0.0
+var shuffle_flash := 0.0
+var no_moves_warning := 0.0
 
 # Commercial tile animation state.
 var tile_offset: Array = []
@@ -257,6 +259,8 @@ func _process(delta: float) -> void:
     unlock_flash = maxf(0.0, unlock_flash - delta * 3.0)
     fever_flash = maxf(0.0, fever_flash - delta * 3.0)
     near_miss_flash = maxf(0.0, near_miss_flash - delta * 3.5)
+    shuffle_flash = maxf(0.0, shuffle_flash - delta * 2.5)
+    no_moves_warning = maxf(0.0, no_moves_warning - delta * 2.5)
     _update_tile_animations(delta)
     _update_booster_paths(delta)
     _update_vfx_rings(delta)
@@ -707,6 +711,13 @@ func _new_level() -> void:
     boss_damage_window = false
     world_flash = 0.0
     _configure_level_hazards()
+
+    # Commercial Match-3 guarantee: start with a match-free board that also has
+    # at least one legal move.
+    var safety := 0
+    while not _has_possible_move() and safety < 80:
+        _reshuffle_board()
+        safety += 1
 
     _configure_level_goal()
     message = _level_objective() + " • " + level_modifier
@@ -1922,7 +1933,7 @@ func _try_swap(a: Vector2i, b: Vector2i) -> void:
     moves -= 1
     cascade = 0
     combo = 0
-    await _resolve_cascade(matches)
+    await _resolve_cascade(matches, not has_special)
     if moves <= 0 and not level_won:
         level_lost = true
         _play_sfx("lose")
@@ -1948,7 +1959,7 @@ func _play_swap_animation(a: Vector2i, b: Vector2i, rejected: bool) -> void:
     if not rejected:
         swap_animating = false
 
-func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
+func _resolve_cascade(initial_matches: Array[Vector2i], allow_new_special: bool = true) -> void:
     var matches := initial_matches
     while not matches.is_empty() and cascade < 12:
         cascade += 1
@@ -1956,6 +1967,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         combo_flash = 1.0
         _play_sfx("combo" if combo >= 2 else "match", combo)
         last_match_count = matches.size()
+
         var multiplier := 1 + mini(combo - 1, 4)
         if fever > 0.0:
             multiplier *= 2
@@ -1974,24 +1986,31 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
 
         if goal_kind == "collect":
             for cell in matches:
-                if board[cell.y][cell.x] == goal_color:
+                if _inside(cell) and board[cell.y][cell.x] == goal_color:
                     goal_progress = mini(goal_target, goal_progress + 1)
 
-        var special_cell := matches[mini(matches.size() / 2, matches.size() - 1)]
+        var special_cell := Vector2i(-1, -1)
         var special_value := -1
-        if matches.size() >= 5:
-            special_value = SPECIAL_COLOR
-        elif matches.size() == 4:
-            special_value = SPECIAL_H if not _vertical_match_at(matches, special_cell) else SPECIAL_V
+        if allow_new_special:
+            var special_info := _special_from_match(matches)
+            special_cell = special_info["cell"]
+            special_value = int(special_info["value"])
         if special_value >= 0:
             _play_sfx("booster", 1.0)
-        if special_value >= 0 and goal_kind == "special":
-            goal_progress = mini(goal_target, goal_progress + 1)
-            _update_daily_quest("special", 1)
+            if goal_kind == "special":
+                goal_progress = mini(goal_target, goal_progress + 1)
+                _update_daily_quest("special", 1)
+
+        # Expand any already-existing special tiles touched by a blast.
+        # This makes cascades chain through boosters instead of merely deleting them.
+        var cleared := _expand_special_effects(matches)
+        for cell in cleared:
+            if not matches.has(cell):
+                matches.append(cell)
 
         message = ("FEVER!  " if fever > 0.0 else "") + "COMBO x%d  +%d" % [combo, points]
         _prime_match_animation(matches)
-        await get_tree().create_timer(0.11).timeout
+        await get_tree().create_timer(0.10).timeout
         _spawn_match_bursts(matches)
         _clear_matches(matches, special_cell, special_value)
         _damage_hazards(matches)
@@ -2000,14 +2019,25 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
             _apply_snake_damage(matches.size())
         _spawn_attack_effects(matches.size())
         _set_combat_animation("attack")
-        _emit_combat_particles(true, mini(40, 14 + matches.size() * 4))
+        _emit_combat_particles(true, mini(48, 14 + matches.size() * 4))
         _collapse()
         refill_anim = 0.0
         hero_attack = 1.0
         screen_shake = minf(1.0, 0.18 + cascade * 0.06)
-        await get_tree().create_timer(0.10).timeout
+
+        await get_tree().create_timer(0.16).timeout
         matches = _find_matches()
-        if matches.size() == 0 and combo >= 2:
+
+        # If the board has no automatic cascade and no legal move remains,
+        # reshuffle instead of leaving the player trapped.
+        if matches.is_empty() and not _has_possible_move():
+            _reshuffle_board()
+            shuffle_flash = 1.0
+            no_moves_warning = 1.0
+            message = "لا توجد حركات! تم خلط اللوحة."
+            matches = []
+
+        if matches.is_empty() and combo >= 2:
             near_miss_flash = 1.0
             message = "SÉRIE TERMINÉE ! Prépare le prochain COMBO."
 
@@ -2020,6 +2050,7 @@ func _resolve_cascade(initial_matches: Array[Vector2i]) -> void:
         hazards[vine_cell.y][vine_cell.x] = 2
         message = "الكروم تزحف إلى اللوحة!"
     _check_goal()
+
 func _damage_hazards(matches: Array[Vector2i]) -> void:
     for cell in matches:
         if not _inside(cell):
@@ -2435,6 +2466,137 @@ func _swap(a: Vector2i, b: Vector2i) -> void:
     var tmp = board[a.y][a.x]
     board[a.y][a.x] = board[b.y][b.x]
     board[b.y][b.x] = tmp
+
+func _special_from_match(matches: Array[Vector2i]) -> Dictionary:
+    if matches.size() < 4:
+        return {"cell": Vector2i(-1, -1), "value": -1}
+
+    var rows := {}
+    var cols := {}
+    for cell in matches:
+        rows[cell.y] = int(rows.get(cell.y, 0)) + 1
+        cols[cell.x] = int(cols.get(cell.x, 0)) + 1
+
+    # 5+ with a crossing/L/T shape creates a bomb; a straight 5 creates a color bomb.
+    if matches.size() >= 5:
+        for cell in matches:
+            if int(rows.get(cell.y, 0)) >= 3 and int(cols.get(cell.x, 0)) >= 3:
+                return {"cell": cell, "value": SPECIAL_BOMB}
+        return {"cell": matches[mini(matches.size() / 2, matches.size() - 1)], "value": SPECIAL_COLOR}
+
+    # Four in a row creates a striped booster perpendicular to the match.
+    for cell in matches:
+        if int(cols.get(cell.x, 0)) >= 4:
+            return {"cell": cell, "value": SPECIAL_H}
+        if int(rows.get(cell.y, 0)) >= 4:
+            return {"cell": cell, "value": SPECIAL_V}
+
+    return {"cell": Vector2i(-1, -1), "value": -1}
+
+func _expand_special_effects(initial: Array[Vector2i]) -> Array[Vector2i]:
+    var out := {}
+    var queue: Array[Vector2i] = initial.duplicate()
+    var processed := {}
+    while not queue.is_empty():
+        var cell: Vector2i = queue.pop_front()
+        if not _inside(cell) or processed.has(cell):
+            continue
+        processed[cell] = true
+        var value: int = int(board[cell.y][cell.x])
+        if value == SPECIAL_H:
+            for x in COLS:
+                out[Vector2i(x, cell.y)] = true
+        elif value == SPECIAL_V:
+            for y in ROWS:
+                out[Vector2i(cell.x, y)] = true
+        elif value == SPECIAL_BOMB:
+            for y in range(maxi(0, cell.y - 1), mini(ROWS, cell.y + 2)):
+                for x in range(maxi(0, cell.x - 1), mini(COLS, cell.x + 2)):
+                    out[Vector2i(x, y)] = true
+        elif value == SPECIAL_COLOR:
+            # A color bomb touched by a cascade removes the most common normal color.
+            var counts := {}
+            for y in ROWS:
+                for x in COLS:
+                    var v: int = int(board[y][x])
+                    if v >= 0 and v < COLORS.size():
+                        counts[v] = int(counts.get(v, 0)) + 1
+            var best_color := 0
+            var best_count := -1
+            for v in counts.keys():
+                if int(counts[v]) > best_count:
+                    best_color = int(v)
+                    best_count = int(counts[v])
+            for y in ROWS:
+                for x in COLS:
+                    if int(board[y][x]) == best_color:
+                        out[Vector2i(x, y)] = true
+        for extra in out.keys():
+            if not processed.has(extra):
+                queue.append(extra)
+    return Array(out.keys())
+
+func _has_possible_move() -> bool:
+    for y in ROWS:
+        for x in COLS:
+            var a := Vector2i(x, y)
+            if x + 1 < COLS and _would_swap_match(a, Vector2i(x + 1, y)):
+                return true
+            if y + 1 < ROWS and _would_swap_match(a, Vector2i(x, y + 1)):
+                return true
+    return false
+
+func _would_swap_match(a: Vector2i, b: Vector2i) -> bool:
+    var av: int = int(board[a.y][a.x])
+    var bv: int = int(board[b.y][b.x])
+    if av < 0 or bv < 0:
+        return false
+    if _is_special(av) or _is_special(bv):
+        return true
+    _swap(a, b)
+    var result := not _find_matches().is_empty()
+    _swap(a, b)
+    return result
+
+func _reshuffle_board() -> void:
+    var values: Array = []
+    for y in ROWS:
+        for x in COLS:
+            var v: int = int(board[y][x])
+            if v < 0 or _is_special(v):
+                v = randi() % COLORS.size()
+            values.append(v)
+    var attempts := 0
+    while attempts < 160:
+        values.shuffle()
+        var candidate: Array = []
+        for y in ROWS:
+            var row: Array = []
+            for x in COLS:
+                row.append(values[y * COLS + x])
+            candidate.append(row)
+        var old := board
+        board = candidate
+        var valid := _find_matches().is_empty() and _has_possible_move()
+        if valid:
+            for y in ROWS:
+                for x in COLS:
+                    tile_offset[y][x] = Vector2(0, -CELL * 0.7)
+                    tile_scale[y][x] = 0.88
+                    tile_alpha[y][x] = 1.0
+            collapse_animating = true
+            return
+        board = old
+        attempts += 1
+
+    # Deterministic fallback: regenerate using the same no-match constructor.
+    for y in ROWS:
+        for x in COLS:
+            board[y][x] = randi() % COLORS.size()
+    for y in ROWS:
+        for x in COLS:
+            while (x >= 2 and board[y][x] == board[y][x - 1] and board[y][x] == board[y][x - 2]) or (y >= 2 and board[y][x] == board[y - 1][x] and board[y][x] == board[y - 2][x]):
+                board[y][x] = randi() % COLORS.size()
 
 func _find_matches() -> Array[Vector2i]:
     var found := {}
